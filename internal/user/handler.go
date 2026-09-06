@@ -7,6 +7,8 @@ import (
 	"github.com/BounkhongDev/bkgo/i18n"
 	"github.com/BounkhongDev/bkgo/response"
 	"github.com/gofiber/fiber/v2"
+
+	"github.com/Got17/personal-finance-api/internal/messages"
 )
 
 type UserHandler struct {
@@ -27,7 +29,7 @@ func (h *UserHandler) SignIn(c *fiber.Ctx) error {
 	if err := c.BodyParser(&input); err != nil {
 		msg := i18n.Translate(locale(c), "BAD_REQUEST")
 		if msg == "" {
-			msg = MsgBadRequest
+			msg = messages.MsgBadRequest
 		}
 		return c.Status(fiber.StatusBadRequest).JSON(response.Error("BAD_REQUEST", msg))
 	}
