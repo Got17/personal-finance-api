@@ -96,6 +96,71 @@ Successful responses return `200 OK`:
 }
 ```
 
+## Accounts
+
+### `POST /v1/accounts`
+
+Creates a new financial account for the currently authenticated user.
+Requires a valid Bearer token in the `Authorization` header.
+Accepts `name`, `type` (`checking`, `savings`, `credit_card`, `investment`, `cash`, `loan`, `other`), `currency` (3-letter ISO 4217 code), optional `description`, and optional `is_active` (defaults to `true`).
+Invalid input or unsupported account type/currency returns `422 Unprocessable Entity`.
+
+```json
+{
+  "name": "Main Checking",
+  "type": "checking",
+  "currency": "USD",
+  "description": "Primary daily checking account"
+}
+```
+
+Successful responses return `201 Created` with the created account:
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "c7a8e999-4c0b-4ef8-bb6d-6bb9bd380a22",
+    "user_id": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+    "name": "Main Checking",
+    "type": "checking",
+    "currency": "USD",
+    "description": "Primary daily checking account",
+    "is_active": true,
+    "created_at": "2026-09-06T12:00:00Z",
+    "updated_at": "2026-09-06T12:00:00Z"
+  },
+  "message": ""
+}
+```
+
+### `GET /v1/accounts`
+
+Retrieves all accounts belonging strictly to the currently authenticated user.
+Requires a valid Bearer token. Callers can only list their own accounts.
+
+Successful responses return `200 OK` with an array of accounts:
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "c7a8e999-4c0b-4ef8-bb6d-6bb9bd380a22",
+      "user_id": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+      "name": "Main Checking",
+      "type": "checking",
+      "currency": "USD",
+      "description": "Primary daily checking account",
+      "is_active": true,
+      "created_at": "2026-09-06T12:00:00Z",
+      "updated_at": "2026-09-06T12:00:00Z"
+    }
+  ],
+  "message": ""
+}
+```
+
 ## Health
 
 ### `GET /v1/health`

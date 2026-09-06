@@ -180,6 +180,63 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /v1/accounts:
+    get:
+      operationId: listAccounts
+      summary: List user accounts
+      description: Returns all accounts belonging to the authenticated user.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: A list of the authenticated user's accounts.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountListSuccessResponse'
+        '401':
+          description: Unauthenticated or invalid token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      operationId: createAccount
+      summary: Create a new account
+      description: Creates a new account belonging to the authenticated user.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAccountRequest'
+      responses:
+        '201':
+          description: Account created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountSuccessResponse'
+        '400':
+          description: The request body is malformed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthenticated or invalid token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation failed (e.g. invalid type or unsupported currency code).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /v1/health:
     get:
       operationId: getHealth
@@ -363,3 +420,96 @@ components:
         app:
           type: string
           description: The configured application name.
+    CreateAccountRequest:
+      type: object
+      required:
+        - name
+        - type
+        - currency
+      properties:
+        name:
+          type: string
+          example: Checking Account
+        type:
+          type: string
+          example: checking
+          enum: [checking, savings, credit_card, investment, cash, loan, other]
+        currency:
+          type: string
+          example: USD
+          description: Standard 3-letter ISO 4217 currency code.
+        description:
+          type: string
+          example: Primary daily checking account
+        is_active:
+          type: boolean
+          default: true
+    AccountResponse:
+      type: object
+      required:
+        - id
+        - user_id
+        - name
+        - type
+        - currency
+        - is_active
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: Checking Account
+        type:
+          type: string
+          example: checking
+        currency:
+          type: string
+          example: USD
+        description:
+          type: string
+          example: Primary daily checking account
+        is_active:
+          type: boolean
+          example: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    AccountSuccessResponse:
+      type: object
+      required:
+        - success
+        - data
+        - message
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: '#/components/schemas/AccountResponse'
+        message:
+          type: string
+    AccountListSuccessResponse:
+      type: object
+      required:
+        - success
+        - data
+        - message
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/AccountResponse'
+        message:
+          type: string
