@@ -173,7 +173,7 @@ func TestConfiguredApp_CurrentUserAndWorkspaceIsolation(t *testing.T) {
 		t.Fatalf("me status = %d, want 200", respMe1.StatusCode)
 	}
 	var bodyMe1 struct {
-		Success bool       `json:"success"`
+		Success bool      `json:"success"`
 		Data    user.User `json:"data"`
 	}
 	if err := json.NewDecoder(respMe1.Body).Decode(&bodyMe1); err != nil {
@@ -209,7 +209,7 @@ func TestConfiguredApp_CurrentUserAndWorkspaceIsolation(t *testing.T) {
 		t.Fatalf("me status = %d, want 200", respMe2.StatusCode)
 	}
 	var bodyMe2 struct {
-		Success bool       `json:"success"`
+		Success bool      `json:"success"`
 		Data    user.User `json:"data"`
 	}
 	if err := json.NewDecoder(respMe2.Body).Decode(&bodyMe2); err != nil {
@@ -254,6 +254,15 @@ func (m *multiUserRepoMock) FindByID(_ context.Context, id string) (*user.User, 
 	return u, nil
 }
 
+func (m *multiUserRepoMock) UpdateBaseCurrency(_ context.Context, id string, currency string) (*user.User, error) {
+	u, ok := m.users[id]
+	if !ok {
+		return nil, user.ErrUserNotFound
+	}
+	u.BaseCurrency = currency
+	return u, nil
+}
+
 func (m *multiUserRepoMock) CreateWithWorkspace(_ context.Context, u *user.User, workspaceName string) (*workspace.Workspace, error) {
 	if m.users == nil {
 		m.users = make(map[string]*user.User)
@@ -276,6 +285,14 @@ func (r *mainTestUserRepo) FindByEmail(_ context.Context, email string) (*user.U
 
 func (r *mainTestUserRepo) FindByID(_ context.Context, id string) (*user.User, error) {
 	if r.user != nil && r.user.ID == id {
+		return r.user, nil
+	}
+	return nil, user.ErrUserNotFound
+}
+
+func (r *mainTestUserRepo) UpdateBaseCurrency(_ context.Context, id string, currency string) (*user.User, error) {
+	if r.user != nil && r.user.ID == id {
+		r.user.BaseCurrency = currency
 		return r.user, nil
 	}
 	return nil, user.ErrUserNotFound

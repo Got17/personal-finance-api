@@ -15,11 +15,12 @@ var (
 
 // User is the core domain entity.
 type User struct {
-	ID           string    `json:"id"         gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
-	Email        string    `json:"email"      gorm:"uniqueIndex;not null"`
-	PasswordHash string    `json:"-"          gorm:"not null"`
-	CreatedAt    time.Time `json:"created_at" gorm:"autoCreateTime"`
-	UpdatedAt    time.Time `json:"updated_at" gorm:"autoUpdateTime"`
+	ID           string    `json:"id"            gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
+	Email        string    `json:"email"         gorm:"uniqueIndex;not null"`
+	PasswordHash string    `json:"-"             gorm:"not null"`
+	BaseCurrency string    `json:"base_currency" gorm:"not null;default:'USD'"`
+	CreatedAt    time.Time `json:"created_at"    gorm:"autoCreateTime"`
+	UpdatedAt    time.Time `json:"updated_at"    gorm:"autoUpdateTime"`
 }
 
 // TableName sets the PostgreSQL table name.
@@ -29,5 +30,6 @@ func (User) TableName() string { return "users" }
 type UserRepository interface {
 	FindByEmail(ctx context.Context, email string) (*User, error)
 	FindByID(ctx context.Context, id string) (*User, error)
+	UpdateBaseCurrency(ctx context.Context, id string, currency string) (*User, error)
 	CreateWithWorkspace(ctx context.Context, u *User, workspaceName string) (*workspace.Workspace, error)
 }

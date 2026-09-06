@@ -6,7 +6,6 @@ const (
 	MsgBadRequest         = "Bad request"
 	MsgUserNotFound       = "user not found"
 	MsgEmailAlreadyExists = "email already in use"
-	MsgWorkspaceNotFound = "workspace not found"
-	MsgAccessDenied      = "access denied to workspace"
+	MsgWorkspaceNotFound  = "workspace not found"
+	MsgAccessDenied       = "access denied to workspace"
 )
-
