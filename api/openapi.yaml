@@ -6,6 +6,42 @@ info:
 servers:
   - url: http://localhost:8080
 paths:
+  /v1/auth/login:
+    post:
+      operationId: signIn
+      summary: Sign in with an email address and password
+      description: Issues a bearer session token for valid credentials.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignInRequest'
+      responses:
+        '200':
+          description: An authenticated session was issued.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SignInSuccessResponse'
+        '400':
+          description: The request body is malformed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: The supplied credentials are invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: The request did not contain valid credentials.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /v1/health:
     get:
       operationId: getHealth
@@ -20,6 +56,56 @@ paths:
                 $ref: '#/components/schemas/HealthSuccessResponse'
 components:
   schemas:
+    SignInRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+          writeOnly: true
+    SignInSuccessResponse:
+      type: object
+      required:
+        - success
+        - data
+        - message
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          type: object
+          required:
+            - access_token
+            - token_type
+          properties:
+            access_token:
+              type: string
+            token_type:
+              type: string
+              const: Bearer
+        message:
+          type: string
+    ErrorResponse:
+      type: object
+      required:
+        - success
+        - error
+        - message
+      properties:
+        success:
+          type: boolean
+          const: false
+        error:
+          type: string
+        message:
+          type: string
     HealthSuccessResponse:
       type: object
       required:
