@@ -12,6 +12,7 @@ import (
 	"github.com/BounkhongDev/bkgo/middleware"
 	"github.com/gofiber/fiber/v2"
 
+	"github.com/Got17/personal-finance-api/internal/httputil"
 	"github.com/Got17/personal-finance-api/internal/workspace"
 )
 
@@ -123,7 +124,7 @@ func TestGetWorkspace_NonOwnerAccessIsForbidden(t *testing.T) {
 		t.Fatalf("decode response: %v", err)
 	}
 
-	if body.Success || body.Error != "FORBIDDEN" {
+	if body.Success || body.Error != httputil.ErrCodeForbidden {
 		t.Fatalf("unexpected body = %#v, want FORBIDDEN", body)
 	}
 }

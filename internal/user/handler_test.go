@@ -16,6 +16,7 @@ import (
 	"github.com/BounkhongDev/bkgo/middleware"
 	"github.com/gofiber/fiber/v2"
 
+	"github.com/Got17/personal-finance-api/internal/httputil"
 	"github.com/Got17/personal-finance-api/internal/user"
 	"github.com/Got17/personal-finance-api/internal/workspace"
 )
@@ -148,7 +149,7 @@ func TestSignIn_InvalidCredentialsReturnsTheSameSafeError(t *testing.T) {
 			t.Fatalf("decode response: %v", err)
 		}
 		response.Body.Close()
-		if response.StatusCode != 401 || body.Success || body.Error != "UNAUTHORIZED" {
+		if response.StatusCode != 401 || body.Success || body.Error != httputil.ErrCodeUnauthorized {
 			t.Fatalf("response = status %d, body %#v; want safe unauthorized error", response.StatusCode, body)
 		}
 		messages = append(messages, body.Message)
@@ -245,7 +246,7 @@ func TestSignUp_DuplicateIdentityReturnsSafeConflictError(t *testing.T) {
 		t.Fatalf("decode response: %v", err)
 	}
 
-	if body.Success || body.Error != "CONFLICT" {
+	if body.Success || body.Error != httputil.ErrCodeConflict {
 		t.Fatalf("body = %#v, want CONFLICT error", body)
 	}
 }
