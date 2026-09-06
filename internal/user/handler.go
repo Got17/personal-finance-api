@@ -25,7 +25,11 @@ func (h *UserHandler) RegisterAuthRoutes(r fiber.Router) {
 func (h *UserHandler) SignIn(c *fiber.Ctx) error {
 	var input SignInInput
 	if err := c.BodyParser(&input); err != nil {
-		return c.Status(400).JSON(response.Error("BAD_REQUEST", i18n.Translate(locale(c), "BAD_REQUEST")))
+		msg := i18n.Translate(locale(c), "BAD_REQUEST")
+		if msg == "" {
+			msg = "Bad request"
+		}
+		return c.Status(fiber.StatusBadRequest).JSON(response.Error("BAD_REQUEST", msg))
 	}
 	result, err := h.usecase.SignIn(c.Context(), &input)
 	if err != nil {

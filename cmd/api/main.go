@@ -39,6 +39,11 @@ func main() {
 	}
 	defer db.Close()
 
+	if err := db.Raw().Exec(`CREATE EXTENSION IF NOT EXISTS pgcrypto`).Error; err != nil {
+		slog.Error("enable pgcrypto extension failed", "error", err)
+		os.Exit(1)
+	}
+
 	if err := db.Raw().AutoMigrate(&user.User{}); err != nil {
 		slog.Error("automigrate failed", "error", err)
 		os.Exit(1)

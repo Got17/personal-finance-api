@@ -65,7 +65,7 @@ func TestSignIn_ValidCredentialsIssuesAuthenticatedSession(t *testing.T) {
 	}
 }
 
-func TestSignIn_InvalidCredentialsReturnTheSameSafeError(t *testing.T) {
+func TestSignIn_InvalidCredentialsReturnsTheSameSafeError(t *testing.T) {
 	passwordHash, err := hash.Password("correct horse battery staple")
 	if err != nil {
 		t.Fatalf("hash password: %v", err)
@@ -110,6 +110,36 @@ func TestSignIn_InvalidCredentialsReturnTheSameSafeError(t *testing.T) {
 
 	if messages[0] != messages[1] {
 		t.Fatalf("credential failures disclosed different messages: %q and %q", messages[0], messages[1])
+	}
+}
+
+func TestSignIn_MalformedJSONBodyReturnsBadRequest(t *testing.T) {
+	app := fiber.New()
+	handler := user.NewUserHandler(user.NewUserUsecase(&signInRepo{}, jwt.New(config.JWT{Secret: "test-secret"})))
+	handler.RegisterAuthRoutes(app.Group("/v1"))
+
+	request := httptest.NewRequest("POST", "/v1/auth/sign-in", bytes.NewBufferString(`{invalid json`))
+	request.Header.Set("Content-Type", "application/json")
+	response, err := app.Test(request, 5000)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != 400 {
+		t.Fatalf("status = %d, want 400", response.StatusCode)
+	}
+
+	var body struct {
+		Success bool   `json:"success"`
+		Error   string `json:"error"`
+		Message string `json:"message"`
+	}
+	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Success || body.Error != "BAD_REQUEST" || body.Message == "" {
+		t.Fatalf("body = %#v, want non-empty message for BAD_REQUEST", body)
 	}
 }
 
