@@ -21,12 +21,14 @@ func (h *UserHandler) RegisterAuthRoutes(r fiber.Router) {
 	r.Post("/auth/signup", h.SignUp)
 }
 
+const preferencesPath = "/users/me/preferences"
+
 // RegisterProtectedRoutes wires authenticated user identity and preferences routes onto the versioned API.
 func (h *UserHandler) RegisterProtectedRoutes(r fiber.Router) {
 	r.Get("/users/me", h.GetCurrentUser)
-	r.Get("/users/me/preferences", h.GetPreferences)
-	r.Put("/users/me/preferences", h.UpdatePreferences)
-	r.Patch("/users/me/preferences", h.UpdatePreferences)
+	r.Get(preferencesPath, h.GetPreferences)
+	r.Put(preferencesPath, h.UpdatePreferences)
+	r.Patch(preferencesPath, h.UpdatePreferences)
 }
 
 func (h *UserHandler) SignIn(c *fiber.Ctx) error {
