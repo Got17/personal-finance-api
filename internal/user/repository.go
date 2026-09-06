@@ -64,7 +64,7 @@ func (r *userRepository) CreateWithWorkspace(ctx context.Context, u *User, works
 		u.ID = uuid.NewString()
 	}
 	if u.BaseCurrency == "" {
-		u.BaseCurrency = "USD"
+		u.BaseCurrency = DefaultBaseCurrency
 	}
 
 	ws := workspace.Workspace{

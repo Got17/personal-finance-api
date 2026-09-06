@@ -24,7 +24,6 @@ func (h *UserHandler) RegisterAuthRoutes(r fiber.Router) {
 // RegisterProtectedRoutes wires authenticated user identity and preferences routes onto the versioned API.
 func (h *UserHandler) RegisterProtectedRoutes(r fiber.Router) {
 	r.Get("/users/me", h.GetCurrentUser)
-	r.Patch("/users/me", h.UpdateCurrentUser)
 	r.Get("/users/me/preferences", h.GetPreferences)
 	r.Put("/users/me/preferences", h.UpdatePreferences)
 	r.Patch("/users/me/preferences", h.UpdatePreferences)
@@ -60,22 +59,6 @@ func (h *UserHandler) GetCurrentUser(c *fiber.Ctx) error {
 		return httputil.RespondUnauthorized(c)
 	}
 	usr, err := h.usecase.GetCurrentUser(c.Context(), userID)
-	if err != nil {
-		return httputil.RespondError(c, err)
-	}
-	return c.JSON(response.Success(usr))
-}
-
-func (h *UserHandler) UpdateCurrentUser(c *fiber.Ctx) error {
-	userID := httputil.GetUserID(c)
-	if userID == "" {
-		return httputil.RespondUnauthorized(c)
-	}
-	var input UpdatePreferencesInput
-	if err := c.BodyParser(&input); err != nil {
-		return httputil.RespondBadRequest(c)
-	}
-	usr, err := h.usecase.UpdateUser(c.Context(), userID, &input)
 	if err != nil {
 		return httputil.RespondError(c, err)
 	}

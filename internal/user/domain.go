@@ -8,6 +8,8 @@ import (
 	"github.com/Got17/personal-finance-api/internal/workspace"
 )
 
+const DefaultBaseCurrency = "USD"
+
 var (
 	ErrUserNotFound       = errors.New("user not found")
 	ErrEmailAlreadyExists = errors.New("email already in use")

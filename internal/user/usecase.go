@@ -23,7 +23,6 @@ type UserUsecase interface {
 	GetCurrentUser(ctx context.Context, userID string) (*User, error)
 	GetPreferences(ctx context.Context, userID string) (*UserPreferences, error)
 	UpdatePreferences(ctx context.Context, userID string, input *UpdatePreferencesInput) (*UserPreferences, error)
-	UpdateUser(ctx context.Context, userID string, input *UpdatePreferencesInput) (*User, error)
 }
 
 type SignInInput struct {
@@ -57,23 +56,22 @@ var validCurrencies = map[string]bool{
 	"BZD": true, "CAD": true, "CDF": true, "CHF": true, "CLP": true, "CNY": true, "COP": true, "CRC": true,
 	"CUP": true, "CVE": true, "CZK": true, "DJF": true, "DKK": true, "DOP": true, "DZD": true, "EGP": true,
 	"ERN": true, "ETB": true, "EUR": true, "FJD": true, "FKP": true, "GBP": true, "GEL": true, "GHS": true,
-	"GIP": true, "GMD": true, "GNF": true, "GTQ": true, "GYD": true, "HKD": true, "HNL": true, "HRK": true,
-	"HTG": true, "HUF": true, "IDR": true, "ILS": true, "INR": true, "IQD": true, "IRR": true, "ISK": true,
-	"JMD": true, "JOD": true, "JPY": true, "KES": true, "KGS": true, "KHR": true, "KMF": true, "KPW": true,
-	"KRW": true, "KWD": true, "KYD": true, "KZT": true, "LAK": true, "LBP": true, "LKR": true, "LRD": true,
-	"LSL": true, "LYD": true, "MAD": true, "MDL": true, "MGA": true, "MKD": true, "MMK": true, "MNT": true,
-	"MOP": true, "MRU": true, "MUR": true, "MVR": true, "MWK": true, "MXN": true, "MYR": true, "MZN": true,
-	"NAD": true, "NGN": true, "NIO": true, "NOK": true, "NPR": true, "NZD": true, "OMR": true, "PAB": true,
-	"PEN": true, "PGK": true, "PHP": true, "PKR": true, "PLN": true, "PYG": true, "QAR": true, "RON": true,
-	"RSD": true, "RUB": true, "RWF": true, "SAR": true, "SBD": true, "SCR": true, "SDG": true, "SEK": true,
-	"SGD": true, "SHP": true, "SLE": true, "SOS": true, "SRD": true, "SSP": true, "STN": true, "SYP": true,
-	"SZL": true, "THB": true, "TJS": true, "TMT": true, "TND": true, "TOP": true, "TRY": true, "TTD": true,
-	"TWD": true, "TZS": true, "UAH": true, "UGX": true, "USD": true, "UYU": true, "UZS": true, "VES": true,
-	"VND": true, "VUV": true, "WST": true, "XAF": true, "XCD": true, "XOF": true, "XPF": true, "YER": true,
-	"ZAR": true, "ZMW": true, "ZWG": true,
+	"GIP": true, "GMD": true, "GNF": true, "GTQ": true, "GYD": true, "HKD": true, "HNL": true, "HTG": true,
+	"HUF": true, "IDR": true, "ILS": true, "INR": true, "IQD": true, "IRR": true, "ISK": true, "JMD": true,
+	"JOD": true, "JPY": true, "KES": true, "KGS": true, "KHR": true, "KMF": true, "KPW": true, "KRW": true,
+	"KWD": true, "KYD": true, "KZT": true, "LAK": true, "LBP": true, "LKR": true, "LRD": true, "LSL": true,
+	"LYD": true, "MAD": true, "MDL": true, "MGA": true, "MKD": true, "MMK": true, "MNT": true, "MOP": true,
+	"MRU": true, "MUR": true, "MVR": true, "MWK": true, "MXN": true, "MYR": true, "MZN": true, "NAD": true,
+	"NGN": true, "NIO": true, "NOK": true, "NPR": true, "NZD": true, "OMR": true, "PAB": true, "PEN": true,
+	"PGK": true, "PHP": true, "PKR": true, "PLN": true, "PYG": true, "QAR": true, "RON": true, "RSD": true,
+	"RUB": true, "RWF": true, "SAR": true, "SBD": true, "SCR": true, "SDG": true, "SEK": true, "SGD": true,
+	"SHP": true, "SLE": true, "SOS": true, "SRD": true, "SSP": true, "STN": true, "SYP": true, "SZL": true,
+	"THB": true, "TJS": true, "TMT": true, "TND": true, "TOP": true, "TRY": true, "TTD": true, "TWD": true,
+	"TZS": true, "UAH": true, "UGX": true, "USD": true, "UYU": true, "UZS": true, "VES": true, "VND": true,
+	"VUV": true, "WST": true, "XAF": true, "XCD": true, "XOF": true, "XPF": true, "YER": true, "ZAR": true,
+	"ZMW": true, "ZWG": true,
 }
 
-// IsValidISO4217 checks if the string is a valid ISO 4217 currency code.
 func IsValidISO4217(code string) bool {
 	return validCurrencies[strings.ToUpper(strings.TrimSpace(code))]
 }
@@ -141,7 +139,7 @@ func (u *userUsecase) SignUp(ctx context.Context, input *SignUpInput) (*Session,
 		ID:           uuid.NewString(),
 		Email:        input.Email,
 		PasswordHash: passwordHash,
-		BaseCurrency: "USD",
+		BaseCurrency: DefaultBaseCurrency,
 	}
 
 	if _, err := u.repo.CreateWithWorkspace(ctx, newUser, wsName); err != nil {
@@ -170,7 +168,7 @@ func (u *userUsecase) GetCurrentUser(ctx context.Context, userID string) (*User,
 		return nil, err
 	}
 	if entity.BaseCurrency == "" {
-		entity.BaseCurrency = "USD"
+		entity.BaseCurrency = DefaultBaseCurrency
 	}
 	return entity, nil
 }
@@ -187,8 +185,9 @@ func (u *userUsecase) UpdatePreferences(ctx context.Context, userID string, inpu
 	if strings.TrimSpace(userID) == "" {
 		return nil, errs.Unauthorized(messages.MsgUserNotFound)
 	}
-	if input == nil {
-		return nil, errs.UnprocessableFields(messages.MsgValidationFailed, map[string]string{"base_currency": "base_currency is required"})
+
+	if fieldErrs := validator.Validate(input); len(fieldErrs) > 0 {
+		return nil, errs.UnprocessableFields(messages.MsgValidationFailed, fieldErrs)
 	}
 
 	currency := strings.ToUpper(strings.TrimSpace(input.BaseCurrency))
@@ -205,11 +204,4 @@ func (u *userUsecase) UpdatePreferences(ctx context.Context, userID string, inpu
 	}
 
 	return &UserPreferences{BaseCurrency: updatedUser.BaseCurrency}, nil
-}
-
-func (u *userUsecase) UpdateUser(ctx context.Context, userID string, input *UpdatePreferencesInput) (*User, error) {
-	if _, err := u.UpdatePreferences(ctx, userID, input); err != nil {
-		return nil, err
-	}
-	return u.GetCurrentUser(ctx, userID)
 }

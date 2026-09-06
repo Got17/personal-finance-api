@@ -362,6 +362,10 @@ components:
           type: string
         message:
           type: string
+        data:
+          type: object
+          nullable: true
+          description: Optional field validation error details.
     HealthSuccessResponse:
       type: object
       required:
