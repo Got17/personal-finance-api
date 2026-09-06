@@ -72,6 +72,7 @@ var validCurrencies = map[string]bool{
 	"ZMW": true, "ZWG": true,
 }
 
+// IsValidISO4217 reports whether code is a supported ISO 4217 currency code.
 func IsValidISO4217(code string) bool {
 	return validCurrencies[strings.ToUpper(strings.TrimSpace(code))]
 }

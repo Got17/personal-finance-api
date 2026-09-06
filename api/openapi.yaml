@@ -98,37 +98,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-    patch:
-      operationId: updateCurrentUser
-      summary: Update authenticated current-user identity preferences
-      description: Updates current user preferences such as base currency.
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UpdatePreferencesRequest'
-      responses:
-        '200':
-          description: The updated user profile.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CurrentUserSuccessResponse'
-        '401':
-          description: Unauthenticated or invalid token.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '422':
-          description: Validation failure for preference values.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
   /v1/users/me/preferences:
     get:
       operationId: getUserPreferences
