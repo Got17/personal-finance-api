@@ -14,6 +14,7 @@ import (
 	"github.com/BounkhongDev/bkgo/middleware"
 	"github.com/BounkhongDev/bkgo/response"
 	"github.com/gofiber/fiber/v2"
+	fiberlogger "github.com/gofiber/fiber/v2/middleware/logger"
 
 	"github.com/Got17/personal-finance-api/internal/user"
 	"github.com/Got17/personal-finance-api/internal/workspace"
@@ -81,6 +82,7 @@ func main() {
 
 func newApp(appName string) *fiber.App {
 	app := fiber.New(fiber.Config{AppName: appName})
+	app.Use(fiberlogger.New())
 	app.Use(middleware.CORS())
 
 	// Health is public so deployment tooling can verify the service before
