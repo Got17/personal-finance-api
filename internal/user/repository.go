@@ -31,6 +31,17 @@ func (r *userRepository) FindByEmail(ctx context.Context, email string) (*User, 
 	return &entity, nil
 }
 
+func (r *userRepository) FindByID(ctx context.Context, id string) (*User, error) {
+	var entity User
+	if err := r.db.Session(ctx).First(&entity, "id = ?", id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrUserNotFound
+		}
+		return nil, err
+	}
+	return &entity, nil
+}
+
 func (r *userRepository) CreateWithWorkspace(ctx context.Context, u *User, workspaceName string) (*workspace.Workspace, error) {
 	if u.ID == "" {
 		u.ID = uuid.NewString()

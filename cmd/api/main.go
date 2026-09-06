@@ -100,6 +100,7 @@ func newAPIApp(appName string, userHandler *user.UserHandler, workspaceHandler *
 
 	// Protected routes
 	api := app.Group("/v1", middleware.JWT(token))
+	userHandler.RegisterProtectedRoutes(api)
 	workspaceHandler.RegisterRoutes(api)
 
 	return app

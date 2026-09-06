@@ -28,5 +28,6 @@ func (User) TableName() string { return "users" }
 // UserRepository is the port (interface) for User persistence.
 type UserRepository interface {
 	FindByEmail(ctx context.Context, email string) (*User, error)
+	FindByID(ctx context.Context, id string) (*User, error)
 	CreateWithWorkspace(ctx context.Context, u *User, workspaceName string) (*workspace.Workspace, error)
 }

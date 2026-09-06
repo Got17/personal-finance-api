@@ -1,6 +1,6 @@
 # Personal Finance API
 
-## Sign in
+## Authentication & Identity
 
 ### `POST /v1/auth/login`
 
@@ -19,6 +19,42 @@ so the endpoint does not reveal whether an account exists.
 Successful responses return `200 OK` with an `access_token` and a
 `token_type` of `Bearer`. Send the token on protected requests as
 `Authorization: Bearer <access_token>`.
+
+### `POST /v1/auth/signup`
+
+Registers a new user account with an email address and password and automatically
+provisions a primary private workspace. Returns `201 Created` with a session
+JWT token. Duplicate email registration attempts receive a `409 Conflict` response.
+
+```json
+{
+  "email": "newuser@example.com",
+  "password": "securepassword123",
+  "workspace_name": "Personal Workspace"
+}
+```
+
+### `GET /v1/users/me`
+
+Retrieves the identity and profile of the currently authenticated user.
+Requires a valid Bearer token in the `Authorization` header (`Authorization: Bearer <access_token>`).
+Unauthenticated requests or invalid/expired tokens are rejected with a `401 Unauthorized` response.
+User identity is derived strictly from the validated token session, preventing callers from accessing or selecting another user's identity or workspace.
+
+Successful responses return `200 OK` with JSON matching this shape:
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+    "email": "owner@example.com",
+    "created_at": "2026-09-06T12:00:00Z",
+    "updated_at": "2026-09-06T12:00:00Z"
+  },
+  "message": ""
+}
+```
 
 ## Health
 
