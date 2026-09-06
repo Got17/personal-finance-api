@@ -3,7 +3,10 @@ package user
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
+
+	"github.com/google/uuid"
 
 	"github.com/BounkhongDev/bkgo/contract"
 	"github.com/BounkhongDev/bkgo/errs"
@@ -16,11 +19,18 @@ import (
 // UserUsecase defines the business operations for User.
 type UserUsecase interface {
 	SignIn(ctx context.Context, input *SignInInput) (*Session, error)
+	SignUp(ctx context.Context, input *SignUpInput) (*Session, error)
 }
 
 type SignInInput struct {
 	Email    string `json:"email" validate:"required,email"`
 	Password string `json:"password" validate:"required"`
+}
+
+type SignUpInput struct {
+	Email         string `json:"email"          validate:"required,email"`
+	Password      string `json:"password"       validate:"required,min=8"`
+	WorkspaceName string `json:"workspace_name" validate:"omitempty,max=100"`
 }
 
 type Session struct {
@@ -58,6 +68,49 @@ func (u *userUsecase) SignIn(ctx context.Context, input *SignInInput) (*Session,
 	}
 
 	accessToken, err := u.token.Sign(contract.Claims{"sub": entity.ID}, 24*time.Hour)
+	if err != nil {
+		return nil, err
+	}
+	return &Session{AccessToken: accessToken, TokenType: "Bearer"}, nil
+}
+
+func (u *userUsecase) SignUp(ctx context.Context, input *SignUpInput) (*Session, error) {
+	if fieldErrs := validator.Validate(input); len(fieldErrs) > 0 {
+		return nil, errs.UnprocessableFields(messages.MsgValidationFailed, fieldErrs)
+	}
+
+	existing, err := u.repo.FindByEmail(ctx, input.Email)
+	if err != nil && !errors.Is(err, ErrUserNotFound) {
+		return nil, err
+	}
+	if existing != nil {
+		return nil, errs.Conflict(messages.MsgEmailAlreadyExists)
+	}
+
+	passwordHash, err := hash.Password(input.Password)
+	if err != nil {
+		return nil, err
+	}
+
+	wsName := strings.TrimSpace(input.WorkspaceName)
+	if wsName == "" {
+		wsName = "Personal Workspace"
+	}
+
+	newUser := &User{
+		ID:           uuid.NewString(),
+		Email:        input.Email,
+		PasswordHash: passwordHash,
+	}
+
+	if _, err := u.repo.CreateWithWorkspace(ctx, newUser, wsName); err != nil {
+		if errors.Is(err, ErrEmailAlreadyExists) {
+			return nil, errs.Conflict(messages.MsgEmailAlreadyExists)
+		}
+		return nil, err
+	}
+
+	accessToken, err := u.token.Sign(contract.Claims{"sub": newUser.ID}, 24*time.Hour)
 	if err != nil {
 		return nil, err
 	}

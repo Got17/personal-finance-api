@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/BounkhongDev/bkgo/adapter/jwt"
@@ -13,7 +15,39 @@ import (
 	"github.com/gofiber/fiber/v2"
 
 	"github.com/Got17/personal-finance-api/internal/user"
+	"github.com/Got17/personal-finance-api/internal/workspace"
 )
+
+type mockUserRepo struct {
+	user           *user.User
+	createdUser    *user.User
+	createdWS      *workspace.Workspace
+	shouldFailInTx bool
+}
+
+func (r *mockUserRepo) FindByEmail(_ context.Context, email string) (*user.User, error) {
+	if r.user != nil && r.user.Email == email {
+		return r.user, nil
+	}
+	if r.createdUser != nil && r.createdUser.Email == email {
+		return r.createdUser, nil
+	}
+	return nil, user.ErrUserNotFound
+}
+
+func (r *mockUserRepo) CreateWithWorkspace(_ context.Context, u *user.User, workspaceName string) (*workspace.Workspace, error) {
+	if r.shouldFailInTx {
+		return nil, errors.New("atomic transaction failed")
+	}
+	ws := &workspace.Workspace{
+		ID:      "ws-123",
+		Name:    workspaceName,
+		OwnerID: u.ID,
+	}
+	r.createdUser = u
+	r.createdWS = ws
+	return ws, nil
+}
 
 func TestSignIn_ValidCredentialsIssuesAuthenticatedSession(t *testing.T) {
 	passwordHash, err := hash.Password("correct horse battery staple")
@@ -22,7 +56,7 @@ func TestSignIn_ValidCredentialsIssuesAuthenticatedSession(t *testing.T) {
 	}
 
 	app := fiber.New()
-	repo := &signInRepo{user: &user.User{
+	repo := &mockUserRepo{user: &user.User{
 		ID:           "user-123",
 		Email:        "owner@example.com",
 		PasswordHash: passwordHash,
@@ -72,7 +106,7 @@ func TestSignIn_InvalidCredentialsReturnsTheSameSafeError(t *testing.T) {
 	}
 
 	app := fiber.New()
-	handler := user.NewUserHandler(user.NewUserUsecase(&signInRepo{user: &user.User{
+	handler := user.NewUserHandler(user.NewUserUsecase(&mockUserRepo{user: &user.User{
 		ID:           "user-123",
 		Email:        "owner@example.com",
 		PasswordHash: passwordHash,
@@ -113,21 +147,81 @@ func TestSignIn_InvalidCredentialsReturnsTheSameSafeError(t *testing.T) {
 	}
 }
 
-func TestSignIn_MalformedJSONBodyReturnsBadRequest(t *testing.T) {
+func TestSignUp_ValidRegistrationIssuesSessionAndCreatesWorkspace(t *testing.T) {
 	app := fiber.New()
-	handler := user.NewUserHandler(user.NewUserUsecase(&signInRepo{}, jwt.New(config.JWT{Secret: "test-secret"})))
+	repo := &mockUserRepo{}
+	token := jwt.New(config.JWT{Secret: "test-secret"})
+	handler := user.NewUserHandler(user.NewUserUsecase(repo, token))
 	handler.RegisterAuthRoutes(app.Group("/v1"))
 
-	request := httptest.NewRequest("POST", "/v1/auth/login", bytes.NewBufferString(`{invalid json`))
+	input := `{"email":"newvisitor@example.com","password":"securepassword123","workspace_name":"My Wealth Vault"}`
+	request := httptest.NewRequest("POST", "/v1/auth/signup", bytes.NewBufferString(input))
 	request.Header.Set("Content-Type", "application/json")
+
 	response, err := app.Test(request, 5000)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
 	defer response.Body.Close()
 
-	if response.StatusCode != 400 {
-		t.Fatalf("status = %d, want 400", response.StatusCode)
+	if response.StatusCode != 201 {
+		t.Fatalf("status = %d, want 201 Created", response.StatusCode)
+	}
+
+	var body struct {
+		Success bool `json:"success"`
+		Data    struct {
+			AccessToken string `json:"access_token"`
+			TokenType   string `json:"token_type"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	if !body.Success || body.Data.AccessToken == "" || body.Data.TokenType != "Bearer" {
+		t.Fatalf("body = %#v, want Bearer session token", body)
+	}
+
+	// Confidentiality assertion: response JSON must NOT contain password or password_hash
+	respStr := body.Data.AccessToken
+	if strings.Contains(respStr, "securepassword123") {
+		t.Fatalf("credentials leaked in signup response!")
+	}
+
+	// Verify User & Workspace created
+	if repo.createdUser == nil || repo.createdUser.Email != "newvisitor@example.com" {
+		t.Fatalf("user was not created correctly: %#v", repo.createdUser)
+	}
+	if repo.createdWS == nil || repo.createdWS.Name != "My Wealth Vault" || repo.createdWS.OwnerID != repo.createdUser.ID {
+		t.Fatalf("workspace was not provisioned correctly: %#v", repo.createdWS)
+	}
+}
+
+func TestSignUp_DuplicateIdentityReturnsSafeConflictError(t *testing.T) {
+	app := fiber.New()
+	repo := &mockUserRepo{
+		user: &user.User{
+			ID:    "user-existing",
+			Email: "existing@example.com",
+		},
+	}
+	token := jwt.New(config.JWT{Secret: "test-secret"})
+	handler := user.NewUserHandler(user.NewUserUsecase(repo, token))
+	handler.RegisterAuthRoutes(app.Group("/v1"))
+
+	input := `{"email":"existing@example.com","password":"securepassword123"}`
+	request := httptest.NewRequest("POST", "/v1/auth/signup", bytes.NewBufferString(input))
+	request.Header.Set("Content-Type", "application/json")
+
+	response, err := app.Test(request, 5000)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != 409 {
+		t.Fatalf("status = %d, want 409 Conflict for duplicate email", response.StatusCode)
 	}
 
 	var body struct {
@@ -138,18 +232,66 @@ func TestSignIn_MalformedJSONBodyReturnsBadRequest(t *testing.T) {
 	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if body.Success || body.Error != "BAD_REQUEST" || body.Message == "" {
-		t.Fatalf("body = %#v, want non-empty message for BAD_REQUEST", body)
+
+	if body.Success || body.Error != "CONFLICT" {
+		t.Fatalf("body = %#v, want CONFLICT error", body)
 	}
 }
 
-type signInRepo struct {
-	user *user.User
+func TestSignUp_InvalidInputReturnsUnprocessableOrBadRequest(t *testing.T) {
+	app := fiber.New()
+	repo := &mockUserRepo{}
+	token := jwt.New(config.JWT{Secret: "test-secret"})
+	handler := user.NewUserHandler(user.NewUserUsecase(repo, token))
+	handler.RegisterAuthRoutes(app.Group("/v1"))
+
+	// Test malformed JSON
+	request := httptest.NewRequest("POST", "/v1/auth/signup", bytes.NewBufferString(`{invalid json`))
+	request.Header.Set("Content-Type", "application/json")
+	response, err := app.Test(request, 5000)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	response.Body.Close()
+	if response.StatusCode != 400 {
+		t.Fatalf("status = %d, want 400 for malformed json", response.StatusCode)
+	}
+
+	// Test invalid email & short password
+	request = httptest.NewRequest("POST", "/v1/auth/signup", bytes.NewBufferString(`{"email":"notanemail","password":"123"}`))
+	request.Header.Set("Content-Type", "application/json")
+	response, err = app.Test(request, 5000)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	response.Body.Close()
+	if response.StatusCode != 422 {
+		t.Fatalf("status = %d, want 422 for validation failure", response.StatusCode)
+	}
 }
 
-func (r *signInRepo) FindByEmail(_ context.Context, email string) (*user.User, error) {
-	if r.user != nil && r.user.Email == email {
-		return r.user, nil
+func TestSignUp_AtomicProvisioningFailureLeavesNoRecord(t *testing.T) {
+	app := fiber.New()
+	repo := &mockUserRepo{shouldFailInTx: true}
+	token := jwt.New(config.JWT{Secret: "test-secret"})
+	handler := user.NewUserHandler(user.NewUserUsecase(repo, token))
+	handler.RegisterAuthRoutes(app.Group("/v1"))
+
+	input := `{"email":"visitor@example.com","password":"securepassword123"}`
+	request := httptest.NewRequest("POST", "/v1/auth/signup", bytes.NewBufferString(input))
+	request.Header.Set("Content-Type", "application/json")
+
+	response, err := app.Test(request, 5000)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
 	}
-	return nil, user.ErrUserNotFound
+	defer response.Body.Close()
+
+	if response.StatusCode != 500 {
+		t.Fatalf("status = %d, want 500 when atomic transaction fails", response.StatusCode)
+	}
+
+	if repo.createdUser != nil || repo.createdWS != nil {
+		t.Fatalf("atomic provisioning leaked partial record! createdUser=%#v, createdWS=%#v", repo.createdUser, repo.createdWS)
+	}
 }
