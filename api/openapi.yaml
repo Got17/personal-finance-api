@@ -98,6 +98,88 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /v1/users/me/preferences:
+    get:
+      operationId: getUserPreferences
+      summary: Retrieve authenticated user preferences
+      description: Returns current user preference configuration including base currency.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: The user preferences.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPreferencesSuccessResponse'
+        '401':
+          description: Unauthenticated or invalid token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      operationId: updateUserPreferences
+      summary: Update authenticated user preferences
+      description: Updates user preferences such as base currency.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePreferencesRequest'
+      responses:
+        '200':
+          description: The updated user preferences.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPreferencesSuccessResponse'
+        '401':
+          description: Unauthenticated or invalid token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Invalid preference field or unsupported currency code.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    patch:
+      operationId: patchUserPreferences
+      summary: Patch authenticated user preferences
+      description: Patches user preferences such as base currency.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePreferencesRequest'
+      responses:
+        '200':
+          description: The updated user preferences.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPreferencesSuccessResponse'
+        '401':
+          description: Unauthenticated or invalid token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Invalid preference field or unsupported currency code.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /v1/health:
     get:
       operationId: getHealth
@@ -187,6 +269,7 @@ components:
       required:
         - id
         - email
+        - base_currency
         - created_at
         - updated_at
       properties:
@@ -196,12 +279,44 @@ components:
         email:
           type: string
           format: email
+        base_currency:
+          type: string
+          example: USD
         created_at:
           type: string
           format: date-time
         updated_at:
           type: string
           format: date-time
+    UpdatePreferencesRequest:
+      type: object
+      required:
+        - base_currency
+      properties:
+        base_currency:
+          type: string
+          example: EUR
+          description: Standard 3-letter ISO 4217 currency code.
+    UserPreferencesSuccessResponse:
+      type: object
+      required:
+        - success
+        - data
+        - message
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          type: object
+          required:
+            - base_currency
+          properties:
+            base_currency:
+              type: string
+              example: USD
+        message:
+          type: string
     ErrorResponse:
       type: object
       required:
@@ -216,6 +331,10 @@ components:
           type: string
         message:
           type: string
+        data:
+          type: object
+          nullable: true
+          description: Optional field validation error details.
     HealthSuccessResponse:
       type: object
       required:

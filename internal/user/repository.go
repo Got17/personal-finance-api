@@ -42,9 +42,29 @@ func (r *userRepository) FindByID(ctx context.Context, id string) (*User, error)
 	return &entity, nil
 }
 
+func (r *userRepository) UpdateBaseCurrency(ctx context.Context, id string, currency string) (*User, error) {
+	var entity User
+	db := r.db.Session(ctx)
+	if err := db.First(&entity, "id = ?", id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrUserNotFound
+		}
+		return nil, err
+	}
+
+	if err := db.Model(&entity).Update("base_currency", currency).Error; err != nil {
+		return nil, err
+	}
+	entity.BaseCurrency = currency
+	return &entity, nil
+}
+
 func (r *userRepository) CreateWithWorkspace(ctx context.Context, u *User, workspaceName string) (*workspace.Workspace, error) {
 	if u.ID == "" {
 		u.ID = uuid.NewString()
+	}
+	if u.BaseCurrency == "" {
+		u.BaseCurrency = DefaultBaseCurrency
 	}
 
 	ws := workspace.Workspace{

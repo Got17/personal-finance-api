@@ -48,6 +48,18 @@ func (r *mockUserRepo) FindByID(_ context.Context, id string) (*user.User, error
 	return nil, user.ErrUserNotFound
 }
 
+func (r *mockUserRepo) UpdateBaseCurrency(_ context.Context, id string, currency string) (*user.User, error) {
+	if r.user != nil && r.user.ID == id {
+		r.user.BaseCurrency = currency
+		return r.user, nil
+	}
+	if r.createdUser != nil && r.createdUser.ID == id {
+		r.createdUser.BaseCurrency = currency
+		return r.createdUser, nil
+	}
+	return nil, user.ErrUserNotFound
+}
+
 func (r *mockUserRepo) CreateWithWorkspace(_ context.Context, u *user.User, workspaceName string) (*workspace.Workspace, error) {
 	if r.shouldFailInTx {
 		return nil, errors.New("atomic transaction failed")

@@ -49,8 +49,48 @@ Successful responses return `200 OK` with JSON matching this shape:
   "data": {
     "id": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
     "email": "owner@example.com",
+    "base_currency": "USD",
     "created_at": "2026-09-06T12:00:00Z",
     "updated_at": "2026-09-06T12:00:00Z"
+  },
+  "message": ""
+}
+```
+
+### `GET /v1/users/me/preferences`
+
+Retrieves the base currency preference of the currently authenticated user.
+Requires a valid Bearer token. Returns `200 OK`:
+
+```json
+{
+  "success": true,
+  "data": {
+    "base_currency": "USD"
+  },
+  "message": ""
+}
+```
+
+### `PUT /v1/users/me/preferences` & `PATCH /v1/users/me/preferences`
+
+Updates the base currency preference for the currently authenticated user.
+Requires a valid Bearer token. Accepts a JSON payload with a valid 3-letter ISO 4217 currency code (`base_currency`).
+Invalid or unsupported currency codes receive a `422 Unprocessable Entity` response.
+
+```json
+{
+  "base_currency": "EUR"
+}
+```
+
+Successful responses return `200 OK`:
+
+```json
+{
+  "success": true,
+  "data": {
+    "base_currency": "EUR"
   },
   "message": ""
 }
