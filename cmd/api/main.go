@@ -13,6 +13,8 @@ import (
 	"github.com/BounkhongDev/bkgo/middleware"
 	"github.com/BounkhongDev/bkgo/response"
 	"github.com/gofiber/fiber/v2"
+
+	"github.com/Got17/personal-finance-api/internal/user"
 )
 
 func main() {
@@ -37,9 +39,7 @@ func main() {
 	}
 	defer db.Close()
 
-	// TODO: register your domain models here for auto-migration
-	// e.g. after bkgo g module user → add &user.User{}
-	if err := db.Raw().AutoMigrate(); err != nil {
+	if err := db.Raw().AutoMigrate(&user.User{}); err != nil {
 		slog.Error("automigrate failed", "error", err)
 		os.Exit(1)
 	}
@@ -53,14 +53,11 @@ func main() {
 
 	token := jwt.New(cfg.JWT)
 
-	app := newApp(cfg.App.Name)
+	userHandler := user.NewUserHandler(user.NewUserUsecase(user.NewUserRepository(db), token))
+	app := newAPIApp(cfg.App.Name, userHandler)
 
 	// Protected API routes
 	api := app.Group("/v1", middleware.JWT(token))
-
-	// TODO: register your module routes
-	// userHandler := user.NewUserHandler(user.NewUserUsecase(user.NewUserRepository(db)))
-	// userHandler.RegisterRoutes(api)
 	_ = api
 
 	_ = cache
@@ -82,5 +79,11 @@ func newApp(appName string) *fiber.App {
 		return c.JSON(response.Success(fiber.Map{"status": "ok", "app": appName}))
 	})
 
+	return app
+}
+
+func newAPIApp(appName string, userHandler *user.UserHandler) *fiber.App {
+	app := newApp(appName)
+	userHandler.RegisterAuthRoutes(app.Group("/v1"))
 	return app
 }
