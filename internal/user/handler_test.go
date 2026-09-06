@@ -33,7 +33,7 @@ func TestSignIn_ValidCredentialsIssuesAuthenticatedSession(t *testing.T) {
 
 	request := httptest.NewRequest("POST", "/v1/auth/sign-in", bytes.NewBufferString(`{"email":"owner@example.com","password":"correct horse battery staple"}`))
 	request.Header.Set("Content-Type", "application/json")
-	response, err := app.Test(request)
+	response, err := app.Test(request, 5000)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -87,7 +87,7 @@ func TestSignIn_InvalidCredentialsReturnTheSameSafeError(t *testing.T) {
 	for _, input := range inputs {
 		request := httptest.NewRequest("POST", "/v1/auth/sign-in", bytes.NewBufferString(input))
 		request.Header.Set("Content-Type", "application/json")
-		response, err := app.Test(request)
+		response, err := app.Test(request, 5000)
 		if err != nil {
 			t.Fatalf("request failed: %v", err)
 		}

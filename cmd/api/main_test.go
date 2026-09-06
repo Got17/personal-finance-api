@@ -58,7 +58,7 @@ func TestConfiguredApp_SignInRouteIssuesSession(t *testing.T) {
 
 	request := httptest.NewRequest("POST", "/v1/auth/sign-in", bytes.NewBufferString(`{"email":"owner@example.com","password":"correct horse battery staple"}`))
 	request.Header.Set("Content-Type", "application/json")
-	response, err := app.Test(request)
+	response, err := app.Test(request, 5000)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
