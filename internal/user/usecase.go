@@ -40,19 +40,19 @@ var dummyHash, _ = hash.Password("bkgo-timing-mitigation-dummy-password")
 
 func (u *userUsecase) SignIn(ctx context.Context, input *SignInInput) (*Session, error) {
 	if fieldErrs := validator.Validate(input); len(fieldErrs) > 0 {
-		return nil, errs.UnprocessableFields("validation failed", fieldErrs)
+		return nil, errs.UnprocessableFields(MsgValidationFailed, fieldErrs)
 	}
 
 	entity, err := u.repo.FindByEmail(ctx, input.Email)
 	if err != nil {
 		if errors.Is(err, ErrUserNotFound) {
 			_ = hash.CheckPassword(input.Password, dummyHash)
-			return nil, errs.Unauthorized("invalid email or password")
+			return nil, errs.Unauthorized(MsgInvalidCredentials)
 		}
 		return nil, err
 	}
 	if !hash.CheckPassword(input.Password, entity.PasswordHash) {
-		return nil, errs.Unauthorized("invalid email or password")
+		return nil, errs.Unauthorized(MsgInvalidCredentials)
 	}
 
 	accessToken, err := u.token.Sign(contract.Claims{"sub": entity.ID}, 24*time.Hour)

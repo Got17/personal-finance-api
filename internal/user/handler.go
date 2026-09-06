@@ -27,7 +27,7 @@ func (h *UserHandler) SignIn(c *fiber.Ctx) error {
 	if err := c.BodyParser(&input); err != nil {
 		msg := i18n.Translate(locale(c), "BAD_REQUEST")
 		if msg == "" {
-			msg = "Bad request"
+			msg = MsgBadRequest
 		}
 		return c.Status(fiber.StatusBadRequest).JSON(response.Error("BAD_REQUEST", msg))
 	}
