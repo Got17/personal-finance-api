@@ -4,9 +4,14 @@ import (
 	"context"
 	"errors"
 	"time"
+
+	"github.com/Got17/personal-finance-api/internal/workspace"
 )
 
-var ErrUserNotFound = errors.New("user not found")
+var (
+	ErrUserNotFound       = errors.New("user not found")
+	ErrEmailAlreadyExists = errors.New("email already in use")
+)
 
 // User is the core domain entity.
 type User struct {
@@ -21,7 +26,7 @@ type User struct {
 func (User) TableName() string { return "users" }
 
 // UserRepository is the port (interface) for User persistence.
-// Implement this with any database adapter.
 type UserRepository interface {
 	FindByEmail(ctx context.Context, email string) (*User, error)
+	CreateWithWorkspace(ctx context.Context, u *User, workspaceName string) (*workspace.Workspace, error)
 }

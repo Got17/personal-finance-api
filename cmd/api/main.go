@@ -9,12 +9,14 @@ import (
 	"github.com/BounkhongDev/bkgo/adapter/jwt"
 	"github.com/BounkhongDev/bkgo/adapter/redis"
 	"github.com/BounkhongDev/bkgo/config"
+	"github.com/BounkhongDev/bkgo/contract"
 	"github.com/BounkhongDev/bkgo/logger"
 	"github.com/BounkhongDev/bkgo/middleware"
 	"github.com/BounkhongDev/bkgo/response"
 	"github.com/gofiber/fiber/v2"
 
 	"github.com/Got17/personal-finance-api/internal/user"
+	"github.com/Got17/personal-finance-api/internal/workspace"
 )
 
 func main() {
@@ -44,7 +46,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := db.Raw().AutoMigrate(&user.User{}); err != nil {
+	if err := db.Raw().AutoMigrate(&user.User{}, &workspace.Workspace{}); err != nil {
 		slog.Error("automigrate failed", "error", err)
 		os.Exit(1)
 	}
@@ -58,12 +60,15 @@ func main() {
 
 	token := jwt.New(cfg.JWT)
 
-	userHandler := user.NewUserHandler(user.NewUserUsecase(user.NewUserRepository(db), token))
-	app := newAPIApp(cfg.App.Name, userHandler)
+	userRepo := user.NewUserRepository(db)
+	userUsecase := user.NewUserUsecase(userRepo, token)
+	userHandler := user.NewUserHandler(userUsecase)
 
-	// Protected API routes
-	api := app.Group("/v1", middleware.JWT(token))
-	_ = api
+	workspaceRepo := workspace.NewWorkspaceRepository(db)
+	workspaceUsecase := workspace.NewWorkspaceUsecase(workspaceRepo)
+	workspaceHandler := workspace.NewWorkspaceHandler(workspaceUsecase)
+
+	app := newAPIApp(cfg.App.Name, userHandler, workspaceHandler, token)
 
 	_ = cache
 
@@ -87,8 +92,15 @@ func newApp(appName string) *fiber.App {
 	return app
 }
 
-func newAPIApp(appName string, userHandler *user.UserHandler) *fiber.App {
+func newAPIApp(appName string, userHandler *user.UserHandler, workspaceHandler *workspace.WorkspaceHandler, token contract.Token) *fiber.App {
 	app := newApp(appName)
+
+	// Public routes
 	userHandler.RegisterAuthRoutes(app.Group("/v1"))
+
+	// Protected routes
+	api := app.Group("/v1", middleware.JWT(token))
+	workspaceHandler.RegisterRoutes(api)
+
 	return app
 }

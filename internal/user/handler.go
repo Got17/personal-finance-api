@@ -22,6 +22,7 @@ func NewUserHandler(usecase UserUsecase) *UserHandler {
 // RegisterAuthRoutes wires public authentication routes onto the versioned API.
 func (h *UserHandler) RegisterAuthRoutes(r fiber.Router) {
 	r.Post("/auth/login", h.SignIn)
+	r.Post("/auth/signup", h.SignUp)
 }
 
 func (h *UserHandler) SignIn(c *fiber.Ctx) error {
@@ -38,6 +39,22 @@ func (h *UserHandler) SignIn(c *fiber.Ctx) error {
 		return httpErr(c, err)
 	}
 	return c.JSON(response.Success(result))
+}
+
+func (h *UserHandler) SignUp(c *fiber.Ctx) error {
+	var input SignUpInput
+	if err := c.BodyParser(&input); err != nil {
+		msg := i18n.Translate(locale(c), "BAD_REQUEST")
+		if msg == "" {
+			msg = messages.MsgBadRequest
+		}
+		return c.Status(fiber.StatusBadRequest).JSON(response.Error("BAD_REQUEST", msg))
+	}
+	result, err := h.usecase.SignUp(c.Context(), &input)
+	if err != nil {
+		return httpErr(c, err)
+	}
+	return c.Status(fiber.StatusCreated).JSON(response.Success(result))
 }
 
 // locale reads the Accept-Language header and returns the best matching locale.

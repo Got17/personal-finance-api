@@ -3,10 +3,13 @@ package user
 import (
 	"context"
 	"errors"
+	"strings"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 
 	"github.com/BounkhongDev/bkgo/contract"
+	"github.com/Got17/personal-finance-api/internal/workspace"
 )
 
 type userRepository struct {
@@ -26,4 +29,35 @@ func (r *userRepository) FindByEmail(ctx context.Context, email string) (*User, 
 		return nil, err
 	}
 	return &entity, nil
+}
+
+func (r *userRepository) CreateWithWorkspace(ctx context.Context, u *User, workspaceName string) (*workspace.Workspace, error) {
+	if u.ID == "" {
+		u.ID = uuid.NewString()
+	}
+
+	ws := workspace.Workspace{
+		ID:      uuid.NewString(),
+		Name:    workspaceName,
+		OwnerID: u.ID,
+	}
+
+	err := r.db.Transaction(ctx, func(tx *gorm.DB) error {
+		if err := tx.Create(u).Error; err != nil {
+			return err
+		}
+		if err := tx.Create(&ws).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+
+	if err != nil {
+		if errors.Is(err, gorm.ErrDuplicatedKey) || strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "UNIQUE constraint") {
+			return nil, ErrEmailAlreadyExists
+		}
+		return nil, err
+	}
+
+	return &ws, nil
 }
