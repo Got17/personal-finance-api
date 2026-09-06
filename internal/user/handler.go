@@ -21,7 +21,7 @@ func NewUserHandler(usecase UserUsecase) *UserHandler {
 
 // RegisterAuthRoutes wires public authentication routes onto the versioned API.
 func (h *UserHandler) RegisterAuthRoutes(r fiber.Router) {
-	r.Post("/auth/sign-in", h.SignIn)
+	r.Post("/auth/login", h.SignIn)
 }
 
 func (h *UserHandler) SignIn(c *fiber.Ctx) error {

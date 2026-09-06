@@ -6,7 +6,7 @@ info:
 servers:
   - url: http://localhost:8080
 paths:
-  /v1/auth/sign-in:
+  /v1/auth/login:
     post:
       operationId: signIn
       summary: Sign in with an email address and password

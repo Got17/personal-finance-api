@@ -2,7 +2,7 @@
 
 ## Sign in
 
-### `POST /v1/auth/sign-in`
+### `POST /v1/auth/login`
 
 Authenticates a provisioned user with an email address and password, returning
 a signed JWT bearer token. The endpoint never returns a password or password

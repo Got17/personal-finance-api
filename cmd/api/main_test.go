@@ -56,7 +56,7 @@ func TestConfiguredApp_SignInRouteIssuesSession(t *testing.T) {
 	}}, token))
 	app := newAPIApp("personal-finance-api", handler)
 
-	request := httptest.NewRequest("POST", "/v1/auth/sign-in", bytes.NewBufferString(`{"email":"owner@example.com","password":"correct horse battery staple"}`))
+	request := httptest.NewRequest("POST", "/v1/auth/login", bytes.NewBufferString(`{"email":"owner@example.com","password":"correct horse battery staple"}`))
 	request.Header.Set("Content-Type", "application/json")
 	response, err := app.Test(request, 5000)
 	if err != nil {

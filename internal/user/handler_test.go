@@ -31,7 +31,7 @@ func TestSignIn_ValidCredentialsIssuesAuthenticatedSession(t *testing.T) {
 	handler := user.NewUserHandler(user.NewUserUsecase(repo, token))
 	handler.RegisterAuthRoutes(app.Group("/v1"))
 
-	request := httptest.NewRequest("POST", "/v1/auth/sign-in", bytes.NewBufferString(`{"email":"owner@example.com","password":"correct horse battery staple"}`))
+	request := httptest.NewRequest("POST", "/v1/auth/login", bytes.NewBufferString(`{"email":"owner@example.com","password":"correct horse battery staple"}`))
 	request.Header.Set("Content-Type", "application/json")
 	response, err := app.Test(request, 5000)
 	if err != nil {
@@ -85,7 +85,7 @@ func TestSignIn_InvalidCredentialsReturnsTheSameSafeError(t *testing.T) {
 	}
 	var messages []string
 	for _, input := range inputs {
-		request := httptest.NewRequest("POST", "/v1/auth/sign-in", bytes.NewBufferString(input))
+		request := httptest.NewRequest("POST", "/v1/auth/login", bytes.NewBufferString(input))
 		request.Header.Set("Content-Type", "application/json")
 		response, err := app.Test(request, 5000)
 		if err != nil {
@@ -118,7 +118,7 @@ func TestSignIn_MalformedJSONBodyReturnsBadRequest(t *testing.T) {
 	handler := user.NewUserHandler(user.NewUserUsecase(&signInRepo{}, jwt.New(config.JWT{Secret: "test-secret"})))
 	handler.RegisterAuthRoutes(app.Group("/v1"))
 
-	request := httptest.NewRequest("POST", "/v1/auth/sign-in", bytes.NewBufferString(`{invalid json`))
+	request := httptest.NewRequest("POST", "/v1/auth/login", bytes.NewBufferString(`{invalid json`))
 	request.Header.Set("Content-Type", "application/json")
 	response, err := app.Test(request, 5000)
 	if err != nil {
