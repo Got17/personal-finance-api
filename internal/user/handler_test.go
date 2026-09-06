@@ -8,10 +8,12 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/BounkhongDev/bkgo/adapter/jwt"
 	"github.com/BounkhongDev/bkgo/config"
 	"github.com/BounkhongDev/bkgo/hash"
+	"github.com/BounkhongDev/bkgo/middleware"
 	"github.com/gofiber/fiber/v2"
 
 	"github.com/Got17/personal-finance-api/internal/user"
@@ -30,6 +32,16 @@ func (r *mockUserRepo) FindByEmail(_ context.Context, email string) (*user.User,
 		return r.user, nil
 	}
 	if r.createdUser != nil && r.createdUser.Email == email {
+		return r.createdUser, nil
+	}
+	return nil, user.ErrUserNotFound
+}
+
+func (r *mockUserRepo) FindByID(_ context.Context, id string) (*user.User, error) {
+	if r.user != nil && r.user.ID == id {
+		return r.user, nil
+	}
+	if r.createdUser != nil && r.createdUser.ID == id {
 		return r.createdUser, nil
 	}
 	return nil, user.ErrUserNotFound
@@ -293,5 +305,152 @@ func TestSignUp_AtomicProvisioningFailureLeavesNoRecord(t *testing.T) {
 
 	if repo.createdUser != nil || repo.createdWS != nil {
 		t.Fatalf("atomic provisioning leaked partial record! createdUser=%#v, createdWS=%#v", repo.createdUser, repo.createdWS)
+	}
+}
+
+func TestGetCurrentUser_AuthenticatedCallerRetrievesOwnIdentity(t *testing.T) {
+	app := fiber.New()
+	token := jwt.New(config.JWT{Secret: "test-secret"})
+	repo := &mockUserRepo{
+		user: &user.User{
+			ID:           "user-456",
+			Email:        "me@example.com",
+			PasswordHash: "hashed-secret",
+		},
+	}
+	handler := user.NewUserHandler(user.NewUserUsecase(repo, token))
+	api := app.Group("/v1", middleware.JWT(token))
+	handler.RegisterProtectedRoutes(api)
+
+	authToken, _ := token.Sign(map[string]any{"sub": "user-456"}, time.Hour)
+	req := httptest.NewRequest("GET", "/v1/users/me", nil)
+	req.Header.Set("Authorization", "Bearer "+authToken)
+
+	resp, err := app.Test(req, 5000)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		t.Fatalf("status = %d, want 200 OK", resp.StatusCode)
+	}
+
+	var body struct {
+		Success bool `json:"success"`
+		Data    struct {
+			ID           string `json:"id"`
+			Email        string `json:"email"`
+			PasswordHash string `json:"password_hash,omitempty"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	if !body.Success || body.Data.ID != "user-456" || body.Data.Email != "me@example.com" {
+		t.Fatalf("unexpected user response: %#v", body)
+	}
+	if body.Data.PasswordHash != "" {
+		t.Fatalf("password hash leaked in user profile response!")
+	}
+}
+
+func TestGetCurrentUser_UnauthenticatedAccessRejected(t *testing.T) {
+	app := fiber.New()
+	token := jwt.New(config.JWT{Secret: "test-secret"})
+	repo := &mockUserRepo{
+		user: &user.User{ID: "user-456", Email: "me@example.com"},
+	}
+	handler := user.NewUserHandler(user.NewUserUsecase(repo, token))
+	api := app.Group("/v1", middleware.JWT(token))
+	handler.RegisterProtectedRoutes(api)
+
+	// 1. Missing Authorization header
+	reqNoAuth := httptest.NewRequest("GET", "/v1/users/me", nil)
+	respNoAuth, err := app.Test(reqNoAuth, 5000)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	respNoAuth.Body.Close()
+	if respNoAuth.StatusCode != 401 {
+		t.Fatalf("status = %d, want 401 Unauthorized for missing token", respNoAuth.StatusCode)
+	}
+
+	// 2. Invalid token
+	reqBadToken := httptest.NewRequest("GET", "/v1/users/me", nil)
+	reqBadToken.Header.Set("Authorization", "Bearer invalid.jwt.token")
+	respBadToken, err := app.Test(reqBadToken, 5000)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	respBadToken.Body.Close()
+	if respBadToken.StatusCode != 401 {
+		t.Fatalf("status = %d, want 401 Unauthorized for invalid token", respBadToken.StatusCode)
+	}
+}
+
+func TestGetCurrentUser_NonExistentUserReturnsUnauthorized(t *testing.T) {
+	app := fiber.New()
+	token := jwt.New(config.JWT{Secret: "test-secret"})
+	repo := &mockUserRepo{}
+	handler := user.NewUserHandler(user.NewUserUsecase(repo, token))
+	api := app.Group("/v1", middleware.JWT(token))
+	handler.RegisterProtectedRoutes(api)
+
+	authToken, _ := token.Sign(map[string]any{"sub": "ghost-user"}, time.Hour)
+	req := httptest.NewRequest("GET", "/v1/users/me", nil)
+	req.Header.Set("Authorization", "Bearer "+authToken)
+
+	resp, err := app.Test(req, 5000)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 401 {
+		t.Fatalf("status = %d, want 401 for non-existent user token subject", resp.StatusCode)
+	}
+}
+
+func TestGetCurrentUser_CannotSelectAnotherUserByIdentityOrParams(t *testing.T) {
+	app := fiber.New()
+	token := jwt.New(config.JWT{Secret: "test-secret"})
+	repo := &mockUserRepo{
+		user: &user.User{ID: "user-legit", Email: "legit@example.com"},
+	}
+	handler := user.NewUserHandler(user.NewUserUsecase(repo, token))
+	api := app.Group("/v1", middleware.JWT(token))
+	handler.RegisterProtectedRoutes(api)
+
+	authToken, _ := token.Sign(map[string]any{"sub": "user-legit"}, time.Hour)
+	// Try passing query params attempting to override identity to another user ID
+	req := httptest.NewRequest("GET", "/v1/users/me?user_id=other-user-id&id=other-user-id", nil)
+	req.Header.Set("Authorization", "Bearer "+authToken)
+
+	resp, err := app.Test(req, 5000)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		t.Fatalf("status = %d, want 200 OK", resp.StatusCode)
+	}
+
+	var body struct {
+		Success bool `json:"success"`
+		Data    struct {
+			ID    string `json:"id"`
+			Email string `json:"email"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	// Must resolve to legit user from JWT, ignoring any request query attempt
+	if body.Data.ID != "user-legit" || body.Data.Email != "legit@example.com" {
+		t.Fatalf("user identity was tampered via query params: %#v", body)
 	}
 }

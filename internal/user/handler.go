@@ -5,6 +5,7 @@ import (
 
 	"github.com/BounkhongDev/bkgo/errs"
 	"github.com/BounkhongDev/bkgo/i18n"
+	"github.com/BounkhongDev/bkgo/middleware"
 	"github.com/BounkhongDev/bkgo/response"
 	"github.com/gofiber/fiber/v2"
 
@@ -23,6 +24,11 @@ func NewUserHandler(usecase UserUsecase) *UserHandler {
 func (h *UserHandler) RegisterAuthRoutes(r fiber.Router) {
 	r.Post("/auth/login", h.SignIn)
 	r.Post("/auth/signup", h.SignUp)
+}
+
+// RegisterProtectedRoutes wires authenticated user identity routes onto the versioned API.
+func (h *UserHandler) RegisterProtectedRoutes(r fiber.Router) {
+	r.Get("/users/me", h.GetCurrentUser)
 }
 
 func (h *UserHandler) SignIn(c *fiber.Ctx) error {
@@ -55,6 +61,26 @@ func (h *UserHandler) SignUp(c *fiber.Ctx) error {
 		return httpErr(c, err)
 	}
 	return c.Status(fiber.StatusCreated).JSON(response.Success(result))
+}
+
+func (h *UserHandler) GetCurrentUser(c *fiber.Ctx) error {
+	userID := getUserID(c)
+	if userID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(response.Error("UNAUTHORIZED", i18n.Translate(locale(c), "UNAUTHORIZED")))
+	}
+	user, err := h.usecase.GetCurrentUser(c.Context(), userID)
+	if err != nil {
+		return httpErr(c, err)
+	}
+	return c.JSON(response.Success(user))
+}
+
+func getUserID(c *fiber.Ctx) string {
+	claims := middleware.Claims(c)
+	if sub, ok := claims["sub"].(string); ok {
+		return sub
+	}
+	return ""
 }
 
 // locale reads the Accept-Language header and returns the best matching locale.

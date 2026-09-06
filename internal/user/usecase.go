@@ -20,6 +20,7 @@ import (
 type UserUsecase interface {
 	SignIn(ctx context.Context, input *SignInInput) (*Session, error)
 	SignUp(ctx context.Context, input *SignUpInput) (*Session, error)
+	GetCurrentUser(ctx context.Context, userID string) (*User, error)
 }
 
 type SignInInput struct {
@@ -115,4 +116,18 @@ func (u *userUsecase) SignUp(ctx context.Context, input *SignUpInput) (*Session,
 		return nil, err
 	}
 	return &Session{AccessToken: accessToken, TokenType: "Bearer"}, nil
+}
+
+func (u *userUsecase) GetCurrentUser(ctx context.Context, userID string) (*User, error) {
+	if strings.TrimSpace(userID) == "" {
+		return nil, errs.Unauthorized(messages.MsgUserNotFound)
+	}
+	entity, err := u.repo.FindByID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, ErrUserNotFound) {
+			return nil, errs.Unauthorized(messages.MsgUserNotFound)
+		}
+		return nil, err
+	}
+	return entity, nil
 }
