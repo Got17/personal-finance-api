@@ -1,0 +1,50 @@
+openapi: 3.1.0
+info:
+  title: Personal Finance API
+  version: 1.0.0
+  description: The versioned HTTP API for Personal Finance Hub.
+servers:
+  - url: http://localhost:8080
+paths:
+  /v1/health:
+    get:
+      operationId: getHealth
+      summary: Check service health
+      description: Returns the service health without requiring authentication.
+      responses:
+        '200':
+          description: The service is available.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthSuccessResponse'
+components:
+  schemas:
+    HealthSuccessResponse:
+      type: object
+      required:
+        - success
+        - data
+        - message
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: '#/components/schemas/HealthResponse'
+        message:
+          type: string
+          description: The standard response message, empty for this endpoint.
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - app
+      properties:
+        status:
+          type: string
+          const: ok
+          description: The service health status.
+        app:
+          type: string
+          description: The configured application name.
