@@ -24,7 +24,9 @@ func (h *UserHandler) RegisterAuthRoutes(r fiber.Router) {
 
 // RegisterProtectedRoutes wires authenticated user identity and preferences routes onto the versioned API.
 func (h *UserHandler) RegisterProtectedRoutes(r fiber.Router) {
-	me := r.Group("/users/me")
+	users := r.Group("/users")
+
+	me := users.Group("/me")
 	me.Get("/", h.GetCurrentUser)
 
 	prefs := me.Group("/preferences")
@@ -32,6 +34,7 @@ func (h *UserHandler) RegisterProtectedRoutes(r fiber.Router) {
 	prefs.Put("/", h.UpdatePreferences)
 	prefs.Patch("/", h.UpdatePreferences)
 }
+
 
 
 func (h *UserHandler) SignIn(c *fiber.Ctx) error {
