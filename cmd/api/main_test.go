@@ -12,6 +12,7 @@ import (
 	"github.com/BounkhongDev/bkgo/config"
 	"github.com/BounkhongDev/bkgo/hash"
 
+	"github.com/Got17/personal-finance-api/internal/account"
 	"github.com/Got17/personal-finance-api/internal/user"
 	"github.com/Got17/personal-finance-api/internal/workspace"
 )
@@ -58,7 +59,8 @@ func TestConfiguredApp_SignInRouteIssuesSession(t *testing.T) {
 	}}
 	uHandler := user.NewUserHandler(user.NewUserUsecase(userRepo, token))
 	wHandler := workspace.NewWorkspaceHandler(workspace.NewWorkspaceUsecase(&mainTestWorkspaceRepo{}))
-	app := newAPIApp("personal-finance-api", uHandler, wHandler, token)
+	acctHandler := account.NewAccountHandler(account.NewAccountUsecase(&mainTestAccountRepo{}))
+	app := newAPIApp("personal-finance-api", uHandler, wHandler, acctHandler, token)
 
 	request := httptest.NewRequest("POST", "/v1/auth/login", bytes.NewBufferString(`{"email":"owner@example.com","password":"correct horse battery staple"}`))
 	request.Header.Set("Content-Type", "application/json")
@@ -84,7 +86,8 @@ func TestConfiguredApp_SignUpAndWorkspaceAccess(t *testing.T) {
 
 	uHandler := user.NewUserHandler(user.NewUserUsecase(uRepo, token))
 	wHandler := workspace.NewWorkspaceHandler(workspace.NewWorkspaceUsecase(wsRepo))
-	app := newAPIApp("personal-finance-api", uHandler, wHandler, token)
+	acctHandler := account.NewAccountHandler(account.NewAccountUsecase(&mainTestAccountRepo{}))
+	app := newAPIApp("personal-finance-api", uHandler, wHandler, acctHandler, token)
 
 	// 1. Signup
 	signUpReq := httptest.NewRequest("POST", "/v1/auth/signup", bytes.NewBufferString(`{"email":"newowner@example.com","password":"securepassword123","workspace_name":"Private Vault"}`))
@@ -153,7 +156,8 @@ func TestConfiguredApp_CurrentUserAndWorkspaceIsolation(t *testing.T) {
 
 	uHandler := user.NewUserHandler(user.NewUserUsecase(userRepo, token))
 	wHandler := workspace.NewWorkspaceHandler(workspace.NewWorkspaceUsecase(wsRepo))
-	app := newAPIApp("personal-finance-api", uHandler, wHandler, token)
+	acctHandler := account.NewAccountHandler(account.NewAccountUsecase(&mainTestAccountRepo{}))
+	app := newAPIApp("personal-finance-api", uHandler, wHandler, acctHandler, token)
 
 	// User 1 Token
 	token1, _ := token.Sign(map[string]any{"sub": "user-1"}, time.Hour)
@@ -231,6 +235,93 @@ func TestConfiguredApp_CurrentUserAndWorkspaceIsolation(t *testing.T) {
 	if respForbidden2.StatusCode != 403 {
 		t.Fatalf("status = %d, want 403 Forbidden for cross-user workspace access", respForbidden2.StatusCode)
 	}
+}
+
+func TestConfiguredApp_CreateAndListAccounts(t *testing.T) {
+	token := jwt.New(config.JWT{Secret: "test-secret"})
+	userRepo := &multiUserRepoMock{
+		users: map[string]*user.User{
+			"user-1": {ID: "user-1", Email: "user1@example.com"},
+		},
+	}
+	wsRepo := &mainTestWorkspaceRepo{}
+	acctRepo := &mainTestAccountRepo{}
+
+	uHandler := user.NewUserHandler(user.NewUserUsecase(userRepo, token))
+	wHandler := workspace.NewWorkspaceHandler(workspace.NewWorkspaceUsecase(wsRepo))
+	acctHandler := account.NewAccountHandler(account.NewAccountUsecase(acctRepo))
+	app := newAPIApp("personal-finance-api", uHandler, wHandler, acctHandler, token)
+
+	token1, _ := token.Sign(map[string]any{"sub": "user-1"}, time.Hour)
+
+	// Create account
+	createReq := httptest.NewRequest("POST", "/v1/accounts", bytes.NewBufferString(`{"name":"Main Checking","type":"checking","currency":"USD","description":"Primary account"}`))
+	createReq.Header.Set("Authorization", "Bearer "+token1)
+	createReq.Header.Set("Content-Type", "application/json")
+	createResp, err := app.Test(createReq, 5000)
+	if err != nil {
+		t.Fatalf("create account request failed: %v", err)
+	}
+	defer createResp.Body.Close()
+
+	if createResp.StatusCode != 201 {
+		t.Fatalf("create account status = %d, want 201", createResp.StatusCode)
+	}
+
+	// List accounts
+	listReq := httptest.NewRequest("GET", "/v1/accounts", nil)
+	listReq.Header.Set("Authorization", "Bearer "+token1)
+	listResp, err := app.Test(listReq, 5000)
+	if err != nil {
+		t.Fatalf("list accounts request failed: %v", err)
+	}
+	defer listResp.Body.Close()
+
+	if listResp.StatusCode != 200 {
+		t.Fatalf("list accounts status = %d, want 200", listResp.StatusCode)
+	}
+
+	var listBody struct {
+		Success bool              `json:"success"`
+		Data    []account.Account `json:"data"`
+	}
+	if err := json.NewDecoder(listResp.Body).Decode(&listBody); err != nil {
+		t.Fatalf("decode account list response: %v", err)
+	}
+
+	if len(listBody.Data) != 1 || listBody.Data[0].Name != "Main Checking" {
+		t.Fatalf("account list = %#v, want 1 account named Main Checking", listBody.Data)
+	}
+}
+
+type mainTestAccountRepo struct {
+	accounts map[string]*account.Account
+}
+
+func (m *mainTestAccountRepo) Create(_ context.Context, entity *account.Account) error {
+	if m.accounts == nil {
+		m.accounts = make(map[string]*account.Account)
+	}
+	m.accounts[entity.ID] = entity
+	return nil
+}
+
+func (m *mainTestAccountRepo) FindByUserID(_ context.Context, userID string) ([]*account.Account, error) {
+	var list []*account.Account
+	for _, acct := range m.accounts {
+		if acct.UserID == userID {
+			list = append(list, acct)
+		}
+	}
+	return list, nil
+}
+
+func (m *mainTestAccountRepo) FindByID(_ context.Context, id string) (*account.Account, error) {
+	acct, ok := m.accounts[id]
+	if !ok {
+		return nil, account.ErrAccountNotFound
+	}
+	return acct, nil
 }
 
 type multiUserRepoMock struct {
