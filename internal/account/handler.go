@@ -17,12 +17,14 @@ func NewAccountHandler(usecase AccountUsecase) *AccountHandler {
 
 // RegisterRoutes registers HTTP handlers for Account operations on the Fiber router.
 func (h *AccountHandler) RegisterRoutes(r fiber.Router) {
-	r.Post("/accounts", h.CreateAccount)
-	r.Get("/accounts", h.ListAccounts)
-	r.Put("/accounts/:id", h.UpdateAccount)
-	r.Patch("/accounts/:id", h.UpdateAccount)
-	r.Delete("/accounts/:id", h.DeactivateAccount)
+	accounts := r.Group("/accounts")
+	accounts.Post("/", h.CreateAccount)
+	accounts.Get("/", h.ListAccounts)
+	accounts.Put("/:id", h.UpdateAccount)
+	accounts.Patch("/:id", h.UpdateAccount)
+	accounts.Delete("/:id", h.DeactivateAccount)
 }
+
 
 func (h *AccountHandler) CreateAccount(c *fiber.Ctx) error {
 	userID := httputil.GetUserID(c)
