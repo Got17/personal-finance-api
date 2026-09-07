@@ -7,7 +7,6 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/BounkhongDev/bkgo/contract"
-	"github.com/BounkhongDev/bkgo/errs"
 )
 
 type accountRepository struct {
@@ -34,7 +33,7 @@ func (r *accountRepository) FindByID(ctx context.Context, id string) (*Account, 
 	var entity Account
 	if err := r.db.Session(ctx).First(&entity, "id = ?", id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errs.NotFound("account not found")
+			return nil, ErrAccountNotFound
 		}
 		return nil, err
 	}

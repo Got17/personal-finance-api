@@ -17,9 +17,8 @@ func NewAccountHandler(usecase AccountUsecase) *AccountHandler {
 
 // RegisterRoutes registers HTTP handlers for Account operations on the Fiber router.
 func (h *AccountHandler) RegisterRoutes(r fiber.Router) {
-	g := r.Group("/accounts")
-	g.Post("/", h.CreateAccount)
-	g.Get("/", h.ListAccounts)
+	r.Post("/accounts", h.CreateAccount)
+	r.Get("/accounts", h.ListAccounts)
 }
 
 func (h *AccountHandler) CreateAccount(c *fiber.Ctx) error {

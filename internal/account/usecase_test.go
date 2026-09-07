@@ -145,6 +145,27 @@ func TestCreateAccount_InvalidCurrency(t *testing.T) {
 	}
 }
 
+func TestCreateAccount_WhitespaceOnlyName(t *testing.T) {
+	repo := newMockAccountRepo()
+	uc := account.NewAccountUsecase(repo)
+
+	input := &account.CreateAccountInput{
+		Name:     "   ",
+		Type:     "savings",
+		Currency: "USD",
+	}
+
+	_, err := uc.CreateAccount(context.Background(), "user-123", input)
+	if err == nil {
+		t.Fatal("expected error for whitespace-only name, got nil")
+	}
+
+	ae, ok := errs.IsAppError(err)
+	if !ok || ae.Status != 422 {
+		t.Fatalf("expected 422 AppError, got %#v", err)
+	}
+}
+
 func TestCreateAccount_EmptyUserID(t *testing.T) {
 	repo := newMockAccountRepo()
 	uc := account.NewAccountUsecase(repo)

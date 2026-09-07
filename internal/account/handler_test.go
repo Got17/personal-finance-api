@@ -15,7 +15,6 @@ import (
 	"github.com/gofiber/fiber/v2"
 
 	"github.com/Got17/personal-finance-api/internal/account"
-	"github.com/Got17/personal-finance-api/internal/httputil"
 )
 
 type contractToken interface {
@@ -132,8 +131,11 @@ func TestCreateAccount_HTTP_422UnprocessableEntity(t *testing.T) {
 		t.Fatalf("decode response: %v", err)
 	}
 
-	if body.Success || body.Error != httputil.ErrCodeBadRequest && body.Error != "UNPROCESSABLE_ENTITY" {
-		t.Logf("response body = %#v", body)
+	if body.Success {
+		t.Fatalf("expected success false, got %#v", body)
+	}
+	if body.Error != "UNPROCESSABLE" {
+		t.Fatalf("expected UNPROCESSABLE error code, got %#v", body)
 	}
 }
 

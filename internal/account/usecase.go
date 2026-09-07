@@ -57,6 +57,13 @@ func (u *accountUsecase) CreateAccount(ctx context.Context, userID string, input
 		})
 	}
 
+	name := strings.TrimSpace(input.Name)
+	if name == "" {
+		return nil, errs.UnprocessableFields(messages.MsgValidationFailed, map[string]string{
+			"name": "name is required",
+		})
+	}
+
 	isActive := true
 	if input.IsActive != nil {
 		isActive = *input.IsActive
@@ -65,7 +72,7 @@ func (u *accountUsecase) CreateAccount(ctx context.Context, userID string, input
 	entity := &Account{
 		ID:          uuid.NewString(),
 		UserID:      userID,
-		Name:        strings.TrimSpace(input.Name),
+		Name:        name,
 		Type:        acctType,
 		Currency:    currency,
 		Description: strings.TrimSpace(input.Description),
