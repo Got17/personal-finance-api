@@ -17,9 +17,11 @@ func NewWorkspaceHandler(usecase WorkspaceUsecase) *WorkspaceHandler {
 
 // RegisterRoutes attaches protected workspace routes to the Fiber router.
 func (h *WorkspaceHandler) RegisterRoutes(r fiber.Router) {
-	r.Get("/workspaces", h.ListWorkspaces)
-	r.Get("/workspaces/:id", h.GetWorkspace)
+	workspaces := r.Group("/workspaces")
+	workspaces.Get("/", h.ListWorkspaces)
+	workspaces.Get("/:id", h.GetWorkspace)
 }
+
 
 func (h *WorkspaceHandler) ListWorkspaces(c *fiber.Ctx) error {
 	userID := httputil.GetUserID(c)

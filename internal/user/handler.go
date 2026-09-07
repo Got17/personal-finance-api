@@ -17,19 +17,22 @@ func NewUserHandler(usecase UserUsecase) *UserHandler {
 
 // RegisterAuthRoutes wires public authentication routes onto the versioned API.
 func (h *UserHandler) RegisterAuthRoutes(r fiber.Router) {
-	r.Post("/auth/login", h.SignIn)
-	r.Post("/auth/signup", h.SignUp)
+	auth := r.Group("/auth")
+	auth.Post("/login", h.SignIn)
+	auth.Post("/signup", h.SignUp)
 }
-
-const preferencesPath = "/users/me/preferences"
 
 // RegisterProtectedRoutes wires authenticated user identity and preferences routes onto the versioned API.
 func (h *UserHandler) RegisterProtectedRoutes(r fiber.Router) {
-	r.Get("/users/me", h.GetCurrentUser)
-	r.Get(preferencesPath, h.GetPreferences)
-	r.Put(preferencesPath, h.UpdatePreferences)
-	r.Patch(preferencesPath, h.UpdatePreferences)
+	me := r.Group("/users/me")
+	me.Get("/", h.GetCurrentUser)
+
+	prefs := me.Group("/preferences")
+	prefs.Get("/", h.GetPreferences)
+	prefs.Put("/", h.UpdatePreferences)
+	prefs.Patch("/", h.UpdatePreferences)
 }
+
 
 func (h *UserHandler) SignIn(c *fiber.Ctx) error {
 	var input SignInInput
