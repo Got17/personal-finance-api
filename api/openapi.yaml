@@ -237,7 +237,159 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /v1/accounts/{id}:
+    put:
+      operationId: updateAccount
+      summary: Update an account
+      description: Updates mutable details of an account belonging to the authenticated user.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAccountRequest'
+      responses:
+        '200':
+          description: Account updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountSuccessResponse'
+        '400':
+          description: The request body is malformed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthenticated or invalid token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden (caller does not own the account).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Account not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    patch:
+      operationId: patchAccount
+      summary: Patch an account
+      description: Patches mutable details of an account belonging to the authenticated user.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAccountRequest'
+      responses:
+        '200':
+          description: Account updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountSuccessResponse'
+        '400':
+          description: The request body is malformed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthenticated or invalid token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden (caller does not own the account).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Account not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      operationId: deactivateAccount
+      summary: Deactivate an account
+      description: Deactivates an account belonging to the authenticated user without erasing the record.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Account deactivated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountSuccessResponse'
+        '401':
+          description: Unauthenticated or invalid token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden (caller does not own the account).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Account not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /v1/health:
+
     get:
       operationId: getHealth
       summary: Check service health
@@ -444,6 +596,26 @@ components:
         is_active:
           type: boolean
           default: true
+    UpdateAccountRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          example: Updated Checking Account
+        type:
+          type: string
+          example: savings
+          enum: [checking, savings, credit_card, investment, cash, loan, other]
+        currency:
+          type: string
+          example: USD
+          description: Standard 3-letter ISO 4217 currency code.
+        description:
+          type: string
+          example: Updated account description
+        is_active:
+          type: boolean
+
     AccountResponse:
       type: object
       required:

@@ -294,6 +294,97 @@ func TestConfiguredApp_CreateAndListAccounts(t *testing.T) {
 	}
 }
 
+func TestConfiguredApp_UpdateAndDeactivateAccount(t *testing.T) {
+	token := jwt.New(config.JWT{Secret: "test-secret"})
+	userRepo := &multiUserRepoMock{
+		users: map[string]*user.User{
+			"user-1": {ID: "user-1", Email: "user1@example.com"},
+			"user-2": {ID: "user-2", Email: "user2@example.com"},
+		},
+	}
+	wsRepo := &mainTestWorkspaceRepo{}
+	acctRepo := &mainTestAccountRepo{}
+
+	uHandler := user.NewUserHandler(user.NewUserUsecase(userRepo, token))
+	wHandler := workspace.NewWorkspaceHandler(workspace.NewWorkspaceUsecase(wsRepo))
+	acctHandler := account.NewAccountHandler(account.NewAccountUsecase(acctRepo))
+	app := newAPIApp("personal-finance-api", uHandler, wHandler, acctHandler, token)
+
+	token1, _ := token.Sign(map[string]any{"sub": "user-1"}, time.Hour)
+	token2, _ := token.Sign(map[string]any{"sub": "user-2"}, time.Hour)
+
+	// 1. Create account as user 1
+	createReq := httptest.NewRequest("POST", "/v1/accounts", bytes.NewBufferString(`{"name":"Initial Name","type":"checking","currency":"USD"}`))
+	createReq.Header.Set("Authorization", "Bearer "+token1)
+	createReq.Header.Set("Content-Type", "application/json")
+	createResp, err := app.Test(createReq, 5000)
+	if err != nil {
+		t.Fatalf("create account failed: %v", err)
+	}
+	defer createResp.Body.Close()
+
+	var createBody struct {
+		Data account.Account `json:"data"`
+	}
+	_ = json.NewDecoder(createResp.Body).Decode(&createBody)
+	acctID := createBody.Data.ID
+
+	// 2. User 2 attempts to update User 1's account -> 403 Forbidden
+	updateReqForbidden := httptest.NewRequest("PATCH", "/v1/accounts/"+acctID, bytes.NewBufferString(`{"name":"Hacked"}`))
+	updateReqForbidden.Header.Set("Authorization", "Bearer "+token2)
+	updateReqForbidden.Header.Set("Content-Type", "application/json")
+	updateRespForbidden, err := app.Test(updateReqForbidden, 5000)
+	if err != nil {
+		t.Fatalf("forbidden update request failed: %v", err)
+	}
+	defer updateRespForbidden.Body.Close()
+	if updateRespForbidden.StatusCode != 403 {
+		t.Fatalf("status = %d, want 403 Forbidden", updateRespForbidden.StatusCode)
+	}
+
+	// 3. User 1 updates their account -> 200 OK
+	updateReq := httptest.NewRequest("PATCH", "/v1/accounts/"+acctID, bytes.NewBufferString(`{"name":"Updated Name","description":"New Description"}`))
+	updateReq.Header.Set("Authorization", "Bearer "+token1)
+	updateReq.Header.Set("Content-Type", "application/json")
+	updateResp, err := app.Test(updateReq, 5000)
+	if err != nil {
+		t.Fatalf("update request failed: %v", err)
+	}
+	defer updateResp.Body.Close()
+	if updateResp.StatusCode != 200 {
+		t.Fatalf("update status = %d, want 200 OK", updateResp.StatusCode)
+	}
+
+	var updateBody struct {
+		Data account.Account `json:"data"`
+	}
+	_ = json.NewDecoder(updateResp.Body).Decode(&updateBody)
+	if updateBody.Data.Name != "Updated Name" || updateBody.Data.Description != "New Description" {
+		t.Fatalf("unexpected updated account data: %#v", updateBody.Data)
+	}
+
+	// 4. User 1 deactivates their account -> 200 OK
+	deactivateReq := httptest.NewRequest("DELETE", "/v1/accounts/"+acctID, nil)
+	deactivateReq.Header.Set("Authorization", "Bearer "+token1)
+	deactivateResp, err := app.Test(deactivateReq, 5000)
+	if err != nil {
+		t.Fatalf("deactivate request failed: %v", err)
+	}
+	defer deactivateResp.Body.Close()
+	if deactivateResp.StatusCode != 200 {
+		t.Fatalf("deactivate status = %d, want 200 OK", deactivateResp.StatusCode)
+	}
+
+	var deactivateBody struct {
+		Data account.Account `json:"data"`
+	}
+	_ = json.NewDecoder(deactivateResp.Body).Decode(&deactivateBody)
+	if deactivateBody.Data.IsActive != false {
+		t.Fatalf("expected IsActive to be false, got true")
+	}
+}
+
+
 type mainTestAccountRepo struct {
 	accounts map[string]*account.Account
 }
@@ -323,6 +414,15 @@ func (m *mainTestAccountRepo) FindByID(_ context.Context, id string) (*account.A
 	}
 	return acct, nil
 }
+
+func (m *mainTestAccountRepo) Update(_ context.Context, entity *account.Account) error {
+	if m.accounts == nil {
+		m.accounts = make(map[string]*account.Account)
+	}
+	m.accounts[entity.ID] = entity
+	return nil
+}
+
 
 type multiUserRepoMock struct {
 	users map[string]*user.User

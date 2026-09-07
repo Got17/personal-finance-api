@@ -183,3 +183,188 @@ func TestListAccounts_HTTP_200OK_And_CrossUserIsolation(t *testing.T) {
 		t.Fatalf("got account ID %q, want acc-1", body.Data[0].ID)
 	}
 }
+
+func TestUpdateAccount_HTTP_200OK(t *testing.T) {
+	app, tokenAdapter, repo := setupTestApp()
+
+	_ = repo.Create(context.Background(), &account.Account{
+		ID: "acc-1", UserID: "user-1", Name: "User 1 Checking", Type: "checking", Currency: "USD", IsActive: true,
+	})
+
+	tokenUser1, _ := tokenAdapter.Sign(contract.Claims{"sub": "user-1"}, time.Hour)
+
+	payload := map[string]any{
+		"name": "Updated Checking",
+		"type": "savings",
+	}
+	bodyBytes, _ := json.Marshal(payload)
+
+	// Test PATCH
+	reqPatch := httptest.NewRequest("PATCH", "/v1/accounts/acc-1", bytes.NewReader(bodyBytes))
+	reqPatch.Header.Set("Authorization", "Bearer "+tokenUser1)
+	reqPatch.Header.Set("Content-Type", "application/json")
+
+	respPatch, err := app.Test(reqPatch, 5000)
+	if err != nil {
+		t.Fatalf("patch request failed: %v", err)
+	}
+	defer respPatch.Body.Close()
+
+	if respPatch.StatusCode != 200 {
+		t.Fatalf("patch status = %d, want 200 OK", respPatch.StatusCode)
+	}
+
+	var bodyPatch struct {
+		Success bool            `json:"success"`
+		Data    account.Account `json:"data"`
+	}
+	if err := json.NewDecoder(respPatch.Body).Decode(&bodyPatch); err != nil {
+		t.Fatalf("decode patch response: %v", err)
+	}
+
+	if !bodyPatch.Success || bodyPatch.Data.Name != "Updated Checking" || bodyPatch.Data.Type != "savings" {
+		t.Fatalf("unexpected patch response data: %#v", bodyPatch)
+	}
+
+	// Test PUT
+	reqPut := httptest.NewRequest("PUT", "/v1/accounts/acc-1", bytes.NewReader(bodyBytes))
+	reqPut.Header.Set("Authorization", "Bearer "+tokenUser1)
+	reqPut.Header.Set("Content-Type", "application/json")
+
+	respPut, err := app.Test(reqPut, 5000)
+	if err != nil {
+		t.Fatalf("put request failed: %v", err)
+	}
+	defer respPut.Body.Close()
+
+	if respPut.StatusCode != 200 {
+		t.Fatalf("put status = %d, want 200 OK", respPut.StatusCode)
+	}
+}
+
+func TestUpdateAccount_HTTP_403Forbidden(t *testing.T) {
+	app, tokenAdapter, repo := setupTestApp()
+
+	_ = repo.Create(context.Background(), &account.Account{
+		ID: "acc-1", UserID: "user-1", Name: "User 1 Checking", Type: "checking", Currency: "USD", IsActive: true,
+	})
+
+	tokenUser2, _ := tokenAdapter.Sign(contract.Claims{"sub": "user-2"}, time.Hour)
+
+	payload := map[string]any{"name": "Hacked Account"}
+	bodyBytes, _ := json.Marshal(payload)
+
+	req := httptest.NewRequest("PATCH", "/v1/accounts/acc-1", bytes.NewReader(bodyBytes))
+	req.Header.Set("Authorization", "Bearer "+tokenUser2)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := app.Test(req, 5000)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 403 {
+		t.Fatalf("status = %d, want 403 Forbidden", resp.StatusCode)
+	}
+}
+
+func TestUpdateAccount_HTTP_404NotFound(t *testing.T) {
+	app, tokenAdapter, _ := setupTestApp()
+	tokenUser1, _ := tokenAdapter.Sign(contract.Claims{"sub": "user-1"}, time.Hour)
+
+	payload := map[string]any{"name": "New Name"}
+	bodyBytes, _ := json.Marshal(payload)
+
+	req := httptest.NewRequest("PATCH", "/v1/accounts/non-existent", bytes.NewReader(bodyBytes))
+	req.Header.Set("Authorization", "Bearer "+tokenUser1)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := app.Test(req, 5000)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 404 {
+		t.Fatalf("status = %d, want 404 Not Found", resp.StatusCode)
+	}
+}
+
+func TestDeactivateAccount_HTTP_200OK(t *testing.T) {
+	app, tokenAdapter, repo := setupTestApp()
+
+	_ = repo.Create(context.Background(), &account.Account{
+		ID: "acc-1", UserID: "user-1", Name: "User 1 Account", Type: "checking", Currency: "USD", IsActive: true,
+	})
+
+	tokenUser1, _ := tokenAdapter.Sign(contract.Claims{"sub": "user-1"}, time.Hour)
+
+	req := httptest.NewRequest("DELETE", "/v1/accounts/acc-1", nil)
+	req.Header.Set("Authorization", "Bearer "+tokenUser1)
+
+	resp, err := app.Test(req, 5000)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		t.Fatalf("status = %d, want 200 OK", resp.StatusCode)
+	}
+
+	var body struct {
+		Success bool            `json:"success"`
+		Data    account.Account `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	if !body.Success || body.Data.IsActive != false {
+		t.Fatalf("expected account to be deactivated, got %#v", body)
+	}
+}
+
+func TestDeactivateAccount_HTTP_403Forbidden(t *testing.T) {
+	app, tokenAdapter, repo := setupTestApp()
+
+	_ = repo.Create(context.Background(), &account.Account{
+		ID: "acc-1", UserID: "user-1", Name: "User 1 Account", Type: "checking", Currency: "USD", IsActive: true,
+	})
+
+	tokenUser2, _ := tokenAdapter.Sign(contract.Claims{"sub": "user-2"}, time.Hour)
+
+	req := httptest.NewRequest("DELETE", "/v1/accounts/acc-1", nil)
+	req.Header.Set("Authorization", "Bearer "+tokenUser2)
+
+	resp, err := app.Test(req, 5000)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 403 {
+		t.Fatalf("status = %d, want 403 Forbidden", resp.StatusCode)
+	}
+}
+
+func TestDeactivateAccount_HTTP_404NotFound(t *testing.T) {
+	app, tokenAdapter, _ := setupTestApp()
+
+	tokenUser1, _ := tokenAdapter.Sign(contract.Claims{"sub": "user-1"}, time.Hour)
+
+	req := httptest.NewRequest("DELETE", "/v1/accounts/non-existent", nil)
+	req.Header.Set("Authorization", "Bearer "+tokenUser1)
+
+	resp, err := app.Test(req, 5000)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 404 {
+		t.Fatalf("status = %d, want 404 Not Found", resp.StatusCode)
+	}
+}
+

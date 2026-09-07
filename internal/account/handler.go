@@ -19,6 +19,9 @@ func NewAccountHandler(usecase AccountUsecase) *AccountHandler {
 func (h *AccountHandler) RegisterRoutes(r fiber.Router) {
 	r.Post("/accounts", h.CreateAccount)
 	r.Get("/accounts", h.ListAccounts)
+	r.Put("/accounts/:id", h.UpdateAccount)
+	r.Patch("/accounts/:id", h.UpdateAccount)
+	r.Delete("/accounts/:id", h.DeactivateAccount)
 }
 
 func (h *AccountHandler) CreateAccount(c *fiber.Ctx) error {
@@ -53,3 +56,41 @@ func (h *AccountHandler) ListAccounts(c *fiber.Ctx) error {
 
 	return c.JSON(response.Success(accounts))
 }
+
+func (h *AccountHandler) UpdateAccount(c *fiber.Ctx) error {
+	userID := httputil.GetUserID(c)
+	if userID == "" {
+		return httputil.RespondUnauthorized(c)
+	}
+
+	accountID := c.Params("id")
+
+	var input UpdateAccountInput
+	if err := c.BodyParser(&input); err != nil {
+		return httputil.RespondBadRequest(c)
+	}
+
+	result, err := h.usecase.UpdateAccount(c.Context(), userID, accountID, &input)
+	if err != nil {
+		return httputil.RespondError(c, err)
+	}
+
+	return c.JSON(response.Success(result))
+}
+
+func (h *AccountHandler) DeactivateAccount(c *fiber.Ctx) error {
+	userID := httputil.GetUserID(c)
+	if userID == "" {
+		return httputil.RespondUnauthorized(c)
+	}
+
+	accountID := c.Params("id")
+
+	result, err := h.usecase.DeactivateAccount(c.Context(), userID, accountID)
+	if err != nil {
+		return httputil.RespondError(c, err)
+	}
+
+	return c.JSON(response.Success(result))
+}
+

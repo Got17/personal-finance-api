@@ -43,10 +43,14 @@ type AccountRepository interface {
 	Create(ctx context.Context, entity *Account) error
 	FindByUserID(ctx context.Context, userID string) ([]*Account, error)
 	FindByID(ctx context.Context, id string) (*Account, error)
+	Update(ctx context.Context, entity *Account) error
 }
 
 // AccountUsecase defines the business operations for Account.
 type AccountUsecase interface {
 	CreateAccount(ctx context.Context, userID string, input *CreateAccountInput) (*Account, error)
 	ListAccounts(ctx context.Context, userID string) ([]*Account, error)
+	UpdateAccount(ctx context.Context, userID string, accountID string, input *UpdateAccountInput) (*Account, error)
+	DeactivateAccount(ctx context.Context, userID string, accountID string) (*Account, error)
 }
+

@@ -161,7 +161,69 @@ Successful responses return `200 OK` with an array of accounts:
 }
 ```
 
+### `PUT /v1/accounts/:id` & `PATCH /v1/accounts/:id`
+
+Updates mutable details of an existing account belonging strictly to the currently authenticated user.
+Requires a valid Bearer token. Callers can only update their own accounts (cross-user updates return `403 Forbidden`).
+Accepts optional fields `name`, `type`, `currency`, `description`, and `is_active`.
+Invalid input or unsupported account type/currency returns `422 Unprocessable Entity`.
+If the account ID does not exist, returns `404 Not Found`.
+
+```json
+{
+  "name": "Updated Checking",
+  "description": "Updated description"
+}
+```
+
+Successful responses return `200 OK` with the updated account:
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "c7a8e999-4c0b-4ef8-bb6d-6bb9bd380a22",
+    "user_id": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+    "name": "Updated Checking",
+    "type": "checking",
+    "currency": "USD",
+    "description": "Updated description",
+    "is_active": true,
+    "created_at": "2026-09-06T12:00:00Z",
+    "updated_at": "2026-09-06T12:00:00Z"
+  },
+  "message": ""
+}
+```
+
+### `DELETE /v1/accounts/:id`
+
+Deactivates an account belonging strictly to the currently authenticated user (`is_active` set to `false`) without erasing the record from the database.
+Requires a valid Bearer token. Callers can only deactivate their own accounts (cross-user deactivation returns `403 Forbidden`).
+If the account ID does not exist, returns `404 Not Found`.
+
+Successful responses return `200 OK` with the deactivated account:
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "c7a8e999-4c0b-4ef8-bb6d-6bb9bd380a22",
+    "user_id": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+    "name": "Updated Checking",
+    "type": "checking",
+    "currency": "USD",
+    "description": "Updated description",
+    "is_active": false,
+    "created_at": "2026-09-06T12:00:00Z",
+    "updated_at": "2026-09-06T12:00:00Z"
+  },
+  "message": ""
+}
+```
+
 ## Health
+
 
 ### `GET /v1/health`
 
