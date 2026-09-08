@@ -17,6 +17,7 @@ import (
 	fiberlogger "github.com/gofiber/fiber/v2/middleware/logger"
 
 	"github.com/Got17/personal-finance-api/internal/account"
+	"github.com/Got17/personal-finance-api/internal/category"
 	"github.com/Got17/personal-finance-api/internal/user"
 	"github.com/Got17/personal-finance-api/internal/workspace"
 )
@@ -48,7 +49,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := db.Raw().AutoMigrate(&user.User{}, &workspace.Workspace{}, &account.Account{}); err != nil {
+	if err := db.Raw().AutoMigrate(&user.User{}, &workspace.Workspace{}, &account.Account{}, &category.Category{}); err != nil {
 		slog.Error("automigrate failed", "error", err)
 		os.Exit(1)
 	}
@@ -74,7 +75,11 @@ func main() {
 	accountUsecase := account.NewAccountUsecase(accountRepo)
 	accountHandler := account.NewAccountHandler(accountUsecase)
 
-	app := newAPIApp(cfg.App.Name, userHandler, workspaceHandler, accountHandler, token)
+	categoryRepo := category.NewCategoryRepository(db)
+	categoryUsecase := category.NewCategoryUsecase(categoryRepo)
+	categoryHandler := category.NewCategoryHandler(categoryUsecase)
+
+	app := newAPIApp(cfg.App.Name, userHandler, workspaceHandler, accountHandler, categoryHandler, token)
 
 	_ = cache
 
@@ -99,7 +104,7 @@ func newApp(appName string) *fiber.App {
 	return app
 }
 
-func newAPIApp(appName string, userHandler *user.UserHandler, workspaceHandler *workspace.WorkspaceHandler, accountHandler *account.AccountHandler, token contract.Token) *fiber.App {
+func newAPIApp(appName string, userHandler *user.UserHandler, workspaceHandler *workspace.WorkspaceHandler, accountHandler *account.AccountHandler, categoryHandler *category.CategoryHandler, token contract.Token) *fiber.App {
 	app := newApp(appName)
 
 	// Public routes
@@ -110,6 +115,7 @@ func newAPIApp(appName string, userHandler *user.UserHandler, workspaceHandler *
 	userHandler.RegisterProtectedRoutes(api)
 	workspaceHandler.RegisterRoutes(api)
 	accountHandler.RegisterRoutes(api)
+	categoryHandler.RegisterRoutes(api)
 
 	return app
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/BounkhongDev/bkgo/hash"
 
 	"github.com/Got17/personal-finance-api/internal/account"
+	"github.com/Got17/personal-finance-api/internal/category"
 	"github.com/Got17/personal-finance-api/internal/user"
 	"github.com/Got17/personal-finance-api/internal/workspace"
 )
@@ -60,7 +61,8 @@ func TestConfiguredApp_SignInRouteIssuesSession(t *testing.T) {
 	uHandler := user.NewUserHandler(user.NewUserUsecase(userRepo, token))
 	wHandler := workspace.NewWorkspaceHandler(workspace.NewWorkspaceUsecase(&mainTestWorkspaceRepo{}))
 	acctHandler := account.NewAccountHandler(account.NewAccountUsecase(&mainTestAccountRepo{}))
-	app := newAPIApp("personal-finance-api", uHandler, wHandler, acctHandler, token)
+	catHandler := category.NewCategoryHandler(category.NewCategoryUsecase(&mainTestCategoryRepo{}))
+	app := newAPIApp("personal-finance-api", uHandler, wHandler, acctHandler, catHandler, token)
 
 	request := httptest.NewRequest("POST", "/v1/auth/login", bytes.NewBufferString(`{"email":"owner@example.com","password":"correct horse battery staple"}`))
 	request.Header.Set("Content-Type", "application/json")
@@ -87,7 +89,8 @@ func TestConfiguredApp_SignUpAndWorkspaceAccess(t *testing.T) {
 	uHandler := user.NewUserHandler(user.NewUserUsecase(uRepo, token))
 	wHandler := workspace.NewWorkspaceHandler(workspace.NewWorkspaceUsecase(wsRepo))
 	acctHandler := account.NewAccountHandler(account.NewAccountUsecase(&mainTestAccountRepo{}))
-	app := newAPIApp("personal-finance-api", uHandler, wHandler, acctHandler, token)
+	catHandler := category.NewCategoryHandler(category.NewCategoryUsecase(&mainTestCategoryRepo{}))
+	app := newAPIApp("personal-finance-api", uHandler, wHandler, acctHandler, catHandler, token)
 
 	// 1. Signup
 	signUpReq := httptest.NewRequest("POST", "/v1/auth/signup", bytes.NewBufferString(`{"email":"newowner@example.com","password":"securepassword123","workspace_name":"Private Vault"}`))
@@ -157,7 +160,8 @@ func TestConfiguredApp_CurrentUserAndWorkspaceIsolation(t *testing.T) {
 	uHandler := user.NewUserHandler(user.NewUserUsecase(userRepo, token))
 	wHandler := workspace.NewWorkspaceHandler(workspace.NewWorkspaceUsecase(wsRepo))
 	acctHandler := account.NewAccountHandler(account.NewAccountUsecase(&mainTestAccountRepo{}))
-	app := newAPIApp("personal-finance-api", uHandler, wHandler, acctHandler, token)
+	catHandler := category.NewCategoryHandler(category.NewCategoryUsecase(&mainTestCategoryRepo{}))
+	app := newAPIApp("personal-finance-api", uHandler, wHandler, acctHandler, catHandler, token)
 
 	// User 1 Token
 	token1, _ := token.Sign(map[string]any{"sub": "user-1"}, time.Hour)
@@ -250,7 +254,8 @@ func TestConfiguredApp_CreateAndListAccounts(t *testing.T) {
 	uHandler := user.NewUserHandler(user.NewUserUsecase(userRepo, token))
 	wHandler := workspace.NewWorkspaceHandler(workspace.NewWorkspaceUsecase(wsRepo))
 	acctHandler := account.NewAccountHandler(account.NewAccountUsecase(acctRepo))
-	app := newAPIApp("personal-finance-api", uHandler, wHandler, acctHandler, token)
+	catHandler := category.NewCategoryHandler(category.NewCategoryUsecase(&mainTestCategoryRepo{}))
+	app := newAPIApp("personal-finance-api", uHandler, wHandler, acctHandler, catHandler, token)
 
 	token1, _ := token.Sign(map[string]any{"sub": "user-1"}, time.Hour)
 
@@ -308,7 +313,8 @@ func TestConfiguredApp_UpdateAndDeactivateAccount(t *testing.T) {
 	uHandler := user.NewUserHandler(user.NewUserUsecase(userRepo, token))
 	wHandler := workspace.NewWorkspaceHandler(workspace.NewWorkspaceUsecase(wsRepo))
 	acctHandler := account.NewAccountHandler(account.NewAccountUsecase(acctRepo))
-	app := newAPIApp("personal-finance-api", uHandler, wHandler, acctHandler, token)
+	catHandler := category.NewCategoryHandler(category.NewCategoryUsecase(&mainTestCategoryRepo{}))
+	app := newAPIApp("personal-finance-api", uHandler, wHandler, acctHandler, catHandler, token)
 
 	token1, _ := token.Sign(map[string]any{"sub": "user-1"}, time.Hour)
 	token2, _ := token.Sign(map[string]any{"sub": "user-2"}, time.Hour)
@@ -384,6 +390,134 @@ func TestConfiguredApp_UpdateAndDeactivateAccount(t *testing.T) {
 	}
 }
 
+func TestConfiguredApp_CreateAndListCategories(t *testing.T) {
+	token := jwt.New(config.JWT{Secret: "test-secret"})
+	userRepo := &multiUserRepoMock{
+		users: map[string]*user.User{
+			"user-1": {ID: "user-1", Email: "user1@example.com"},
+			"user-2": {ID: "user-2", Email: "user2@example.com"},
+		},
+	}
+	wsRepo := &mainTestWorkspaceRepo{}
+	acctRepo := &mainTestAccountRepo{}
+	catRepo := &mainTestCategoryRepo{}
+
+	uHandler := user.NewUserHandler(user.NewUserUsecase(userRepo, token))
+	wHandler := workspace.NewWorkspaceHandler(workspace.NewWorkspaceUsecase(wsRepo))
+	acctHandler := account.NewAccountHandler(account.NewAccountUsecase(acctRepo))
+	catHandler := category.NewCategoryHandler(category.NewCategoryUsecase(catRepo))
+	app := newAPIApp("personal-finance-api", uHandler, wHandler, acctHandler, catHandler, token)
+
+	token1, _ := token.Sign(map[string]any{"sub": "user-1"}, time.Hour)
+	token2, _ := token.Sign(map[string]any{"sub": "user-2"}, time.Hour)
+
+	// 1. Create Income category for User 1
+	incomeReq := httptest.NewRequest("POST", "/v1/categories", bytes.NewBufferString(`{"name":"Salary","type":"income"}`))
+	incomeReq.Header.Set("Authorization", "Bearer "+token1)
+	incomeReq.Header.Set("Content-Type", "application/json")
+	incomeResp, err := app.Test(incomeReq, 5000)
+	if err != nil {
+		t.Fatalf("create income category failed: %v", err)
+	}
+	defer incomeResp.Body.Close()
+	if incomeResp.StatusCode != 201 {
+		t.Fatalf("create income category status = %d, want 201", incomeResp.StatusCode)
+	}
+
+	// 2. Create Expense category for User 1
+	expenseReq := httptest.NewRequest("POST", "/v1/categories", bytes.NewBufferString(`{"name":"Groceries","type":"expense"}`))
+	expenseReq.Header.Set("Authorization", "Bearer "+token1)
+	expenseReq.Header.Set("Content-Type", "application/json")
+	expenseResp, err := app.Test(expenseReq, 5000)
+	if err != nil {
+		t.Fatalf("create expense category failed: %v", err)
+	}
+	defer expenseResp.Body.Close()
+	if expenseResp.StatusCode != 201 {
+		t.Fatalf("create expense category status = %d, want 201", expenseResp.StatusCode)
+	}
+
+	// 3. User 1 lists categories -> gets 2 categories
+	listReq1 := httptest.NewRequest("GET", "/v1/categories", nil)
+	listReq1.Header.Set("Authorization", "Bearer "+token1)
+	listResp1, err := app.Test(listReq1, 5000)
+	if err != nil {
+		t.Fatalf("list categories for user 1 failed: %v", err)
+	}
+	defer listResp1.Body.Close()
+	if listResp1.StatusCode != 200 {
+		t.Fatalf("list categories status = %d, want 200", listResp1.StatusCode)
+	}
+
+	var listBody1 struct {
+		Success bool                `json:"success"`
+		Data    []category.Category `json:"data"`
+	}
+	if err := json.NewDecoder(listResp1.Body).Decode(&listBody1); err != nil {
+		t.Fatalf("decode category list response: %v", err)
+	}
+	if len(listBody1.Data) != 2 {
+		t.Fatalf("user 1 category list count = %d, want 2", len(listBody1.Data))
+	}
+
+	// 4. User 2 lists categories -> gets 0 categories (cross-user isolation)
+	listReq2 := httptest.NewRequest("GET", "/v1/categories", nil)
+	listReq2.Header.Set("Authorization", "Bearer "+token2)
+	listResp2, err := app.Test(listReq2, 5000)
+	if err != nil {
+		t.Fatalf("list categories for user 2 failed: %v", err)
+	}
+	defer listResp2.Body.Close()
+	if listResp2.StatusCode != 200 {
+		t.Fatalf("list categories user 2 status = %d, want 200", listResp2.StatusCode)
+	}
+
+	var listBody2 struct {
+		Success bool                `json:"success"`
+		Data    []category.Category `json:"data"`
+	}
+	if err := json.NewDecoder(listResp2.Body).Decode(&listBody2); err != nil {
+		t.Fatalf("decode category list response user 2: %v", err)
+	}
+	if len(listBody2.Data) != 0 {
+		t.Fatalf("user 2 category list count = %d, want 0", len(listBody2.Data))
+	}
+
+	// 5. Invalid type input -> 422 Unprocessable Entity
+	invalidReq := httptest.NewRequest("POST", "/v1/categories", bytes.NewBufferString(`{"name":"Invalid","type":"invalid_type"}`))
+	invalidReq.Header.Set("Authorization", "Bearer "+token1)
+	invalidReq.Header.Set("Content-Type", "application/json")
+	invalidResp, err := app.Test(invalidReq, 5000)
+	if err != nil {
+		t.Fatalf("invalid category request failed: %v", err)
+	}
+	defer invalidResp.Body.Close()
+	if invalidResp.StatusCode != 422 {
+		t.Fatalf("invalid category status = %d, want 422", invalidResp.StatusCode)
+	}
+}
+
+type mainTestCategoryRepo struct {
+	categories map[string]*category.Category
+}
+
+func (m *mainTestCategoryRepo) Create(_ context.Context, entity *category.Category) error {
+	if m.categories == nil {
+		m.categories = make(map[string]*category.Category)
+	}
+	m.categories[entity.ID] = entity
+	return nil
+}
+
+func (m *mainTestCategoryRepo) FindByUserID(_ context.Context, userID string) ([]*category.Category, error) {
+	var list []*category.Category
+	for _, cat := range m.categories {
+		if cat.UserID == userID {
+			list = append(list, cat)
+		}
+	}
+	return list, nil
+}
 
 type mainTestAccountRepo struct {
 	accounts map[string]*account.Account
@@ -422,7 +556,6 @@ func (m *mainTestAccountRepo) Update(_ context.Context, entity *account.Account)
 	m.accounts[entity.ID] = entity
 	return nil
 }
-
 
 type multiUserRepoMock struct {
 	users map[string]*user.User
