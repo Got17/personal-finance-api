@@ -55,21 +55,21 @@ func (u *accountUsecase) CreateAccount(ctx context.Context, userID string, input
 	acctType := strings.ToLower(strings.TrimSpace(input.Type))
 	if !IsValidAccountType(acctType) {
 		return nil, errs.UnprocessableFields(messages.MsgValidationFailed, map[string]string{
-			"type": "unsupported account type",
+			"type": messages.MsgUnsupportedAccountType,
 		})
 	}
 
 	currency := strings.ToUpper(strings.TrimSpace(input.Currency))
 	if !user.IsValidISO4217(currency) {
 		return nil, errs.UnprocessableFields(messages.MsgValidationFailed, map[string]string{
-			"currency": "invalid currency code",
+			"currency": messages.MsgInvalidCurrencyCode,
 		})
 	}
 
 	name := strings.TrimSpace(input.Name)
 	if name == "" {
 		return nil, errs.UnprocessableFields(messages.MsgValidationFailed, map[string]string{
-			"name": "name is required",
+			"name": messages.MsgNameIsRequired,
 		})
 	}
 
@@ -141,7 +141,7 @@ func (u *accountUsecase) UpdateAccount(ctx context.Context, userID string, accou
 		name := strings.TrimSpace(*input.Name)
 		if name == "" {
 			return nil, errs.UnprocessableFields(messages.MsgValidationFailed, map[string]string{
-				"name": "name is required",
+				"name": messages.MsgNameIsRequired,
 			})
 		}
 		acct.Name = name
@@ -151,7 +151,7 @@ func (u *accountUsecase) UpdateAccount(ctx context.Context, userID string, accou
 		acctType := strings.ToLower(strings.TrimSpace(*input.Type))
 		if !IsValidAccountType(acctType) {
 			return nil, errs.UnprocessableFields(messages.MsgValidationFailed, map[string]string{
-				"type": "unsupported account type",
+				"type": messages.MsgUnsupportedAccountType,
 			})
 		}
 		acct.Type = AccountType(acctType)
@@ -161,7 +161,7 @@ func (u *accountUsecase) UpdateAccount(ctx context.Context, userID string, accou
 		currency := strings.ToUpper(strings.TrimSpace(*input.Currency))
 		if !user.IsValidISO4217(currency) {
 			return nil, errs.UnprocessableFields(messages.MsgValidationFailed, map[string]string{
-				"currency": "invalid currency code",
+				"currency": messages.MsgInvalidCurrencyCode,
 			})
 		}
 		acct.Currency = currency
