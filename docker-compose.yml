@@ -1,4 +1,5 @@
-version: '3.8'
+# yaml-language-server: $schema=https://raw.githubusercontent.com/compose-spec/compose-go/main/schema/compose-spec.json
+name: personal-finance
 
 services:
   postgres:
