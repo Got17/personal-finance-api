@@ -49,18 +49,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := db.Raw().Exec(`DO $$ BEGIN
-		IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'account_type') THEN
-			CREATE TYPE account_type AS ENUM ('checking', 'savings', 'credit_card', 'investment', 'cash', 'loan', 'other');
-		END IF;
-		IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'category_type') THEN
-			CREATE TYPE category_type AS ENUM ('income', 'expense');
-		END IF;
-	END $$;`).Error; err != nil {
-		slog.Error("create enum types failed", "error", err)
-		os.Exit(1)
-	}
-
 	if err := db.Raw().AutoMigrate(&user.User{}, &workspace.Workspace{}, &account.Account{}, &category.Category{}); err != nil {
 		slog.Error("automigrate failed", "error", err)
 		os.Exit(1)

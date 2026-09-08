@@ -38,7 +38,7 @@ type Account struct {
 	ID          string      `json:"id"          gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
 	UserID      string      `json:"user_id"     gorm:"type:uuid;not null;index"`
 	Name        string      `json:"name"        gorm:"not null"`
-	Type        AccountType `json:"type"        gorm:"type:account_type;not null"`
+	Type        AccountType `json:"type"        gorm:"not null"`
 	Currency    string      `json:"currency"    gorm:"not null"`
 	Description string      `json:"description" gorm:"type:text"`
 	IsActive    bool        `json:"is_active"   gorm:"not null;default:true"`
