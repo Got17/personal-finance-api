@@ -222,6 +222,65 @@ Successful responses return `200 OK` with the deactivated account:
 }
 ```
 
+## Categories
+
+### `POST /v1/categories`
+
+Creates a new category for the currently authenticated user.
+Requires a valid Bearer token in the `Authorization` header.
+Accepts `name`, `type` (`income` or `expense`), and optional `is_active` (defaults to `true`).
+Invalid input or unsupported category type returns `422 Unprocessable Entity`.
+
+```json
+{
+  "name": "Salary",
+  "type": "income"
+}
+```
+
+Successful responses return `201 Created` with the created category:
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "e8b9f000-5d1c-4fe9-cc7e-7cc0ce491b33",
+    "user_id": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+    "name": "Salary",
+    "type": "income",
+    "is_active": true,
+    "created_at": "2026-09-08T12:00:00Z",
+    "updated_at": "2026-09-08T12:00:00Z"
+  },
+  "message": ""
+}
+```
+
+### `GET /v1/categories`
+
+Retrieves all categories belonging strictly to the currently authenticated user.
+Requires a valid Bearer token. Callers can only list their own categories.
+
+Successful responses return `200 OK` with an array of categories:
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "e8b9f000-5d1c-4fe9-cc7e-7cc0ce491b33",
+      "user_id": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+      "name": "Salary",
+      "type": "income",
+      "is_active": true,
+      "created_at": "2026-09-08T12:00:00Z",
+      "updated_at": "2026-09-08T12:00:00Z"
+    }
+  ],
+  "message": ""
+}
+```
+
 ## Health
 
 
