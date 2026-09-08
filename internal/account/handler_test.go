@@ -367,4 +367,3 @@ func TestDeactivateAccount_HTTP_404NotFound(t *testing.T) {
 		t.Fatalf("status = %d, want 404 Not Found", resp.StatusCode)
 	}
 }
-

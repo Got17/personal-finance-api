@@ -67,8 +67,8 @@ func TestCreateAccount_Success(t *testing.T) {
 	if result.Name != "Checking Account" {
 		t.Errorf("got Name %q, want %q", result.Name, "Checking Account")
 	}
-	if result.Type != "checking" {
-		t.Errorf("got Type %q, want %q", result.Type, "checking")
+	if result.Type != account.AccountTypeChecking {
+		t.Errorf("got Type %q, want %q", result.Type, account.AccountTypeChecking)
 	}
 	if result.Currency != "USD" {
 		t.Errorf("got Currency %q, want %q", result.Currency, "USD")
@@ -262,7 +262,7 @@ func TestUpdateAccount_Success(t *testing.T) {
 		t.Fatalf("update failed: %v", err)
 	}
 
-	if updated.Name != newName || updated.Type != newType || updated.Currency != newCurr || updated.Description != newDesc || updated.IsActive != false {
+	if updated.Name != newName || updated.Type != account.AccountType(newType) || updated.Currency != newCurr || updated.Description != newDesc || updated.IsActive != false {
 		t.Fatalf("unexpected updated entity: %#v", updated)
 	}
 }
@@ -408,4 +408,3 @@ func TestDeactivateAccount_NotFound(t *testing.T) {
 		t.Fatalf("expected 404 AppError, got %#v", err)
 	}
 }
-
