@@ -11,7 +11,8 @@ Single-context repo layout (`CONTEXT.md` + `docs/adr/` at root). See `docs/agent
 ### Git & PR Workflow
 
 - **No Direct Pushes to `main`**: Pushing code directly to the `main` branch is strictly prohibited.
-- **PR Required**: All code changes, bug fixes, and features must be developed on feature/topic branches and merged into `main` strictly via Pull Requests (PRs).
+- **PR Required**: All code changes, bug fixes, and features must be developed on feature/topic branches and submitted via Pull Requests (PRs).
+- **No Automatic Merging**: NEVER automatically merge PRs or feature branches into `main`. Always create/open the PR and provide the PR link to the user for human review and manual merge.
 
 
 <!-- START AGENT-STANDARD: CLEAN-CODE -->
