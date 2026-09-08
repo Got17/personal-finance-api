@@ -24,7 +24,7 @@ type Category struct {
 	ID        string       `json:"id"         gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
 	UserID    string       `json:"user_id"    gorm:"type:uuid;not null;index"`
 	Name      string       `json:"name"       gorm:"not null"`
-	Type      CategoryType `json:"type"       gorm:"not null"`
+	Type      CategoryType `json:"type"       gorm:"type:category_type;not null"`
 	IsActive  bool         `json:"is_active"  gorm:"not null;default:true"`
 	CreatedAt time.Time    `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt time.Time    `json:"updated_at" gorm:"autoUpdateTime"`
