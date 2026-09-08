@@ -17,9 +17,14 @@ func NewAccountHandler(usecase AccountUsecase) *AccountHandler {
 
 // RegisterRoutes registers HTTP handlers for Account operations on the Fiber router.
 func (h *AccountHandler) RegisterRoutes(r fiber.Router) {
-	r.Post("/accounts", h.CreateAccount)
-	r.Get("/accounts", h.ListAccounts)
+	accounts := r.Group("/accounts")
+	accounts.Post("/", h.CreateAccount)
+	accounts.Get("/", h.ListAccounts)
+	accounts.Put("/:id", h.UpdateAccount)
+	accounts.Patch("/:id", h.UpdateAccount)
+	accounts.Delete("/:id", h.DeactivateAccount)
 }
+
 
 func (h *AccountHandler) CreateAccount(c *fiber.Ctx) error {
 	userID := httputil.GetUserID(c)
@@ -53,3 +58,41 @@ func (h *AccountHandler) ListAccounts(c *fiber.Ctx) error {
 
 	return c.JSON(response.Success(accounts))
 }
+
+func (h *AccountHandler) UpdateAccount(c *fiber.Ctx) error {
+	userID := httputil.GetUserID(c)
+	if userID == "" {
+		return httputil.RespondUnauthorized(c)
+	}
+
+	accountID := c.Params("id")
+
+	var input UpdateAccountInput
+	if err := c.BodyParser(&input); err != nil {
+		return httputil.RespondBadRequest(c)
+	}
+
+	result, err := h.usecase.UpdateAccount(c.Context(), userID, accountID, &input)
+	if err != nil {
+		return httputil.RespondError(c, err)
+	}
+
+	return c.JSON(response.Success(result))
+}
+
+func (h *AccountHandler) DeactivateAccount(c *fiber.Ctx) error {
+	userID := httputil.GetUserID(c)
+	if userID == "" {
+		return httputil.RespondUnauthorized(c)
+	}
+
+	accountID := c.Params("id")
+
+	result, err := h.usecase.DeactivateAccount(c.Context(), userID, accountID)
+	if err != nil {
+		return httputil.RespondError(c, err)
+	}
+
+	return c.JSON(response.Success(result))
+}
+

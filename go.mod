@@ -3,8 +3,9 @@ module github.com/Got17/personal-finance-api
 go 1.22
 
 require (
-	github.com/BounkhongDev/bkgo v0.2.7
+	github.com/BounkhongDev/bkgo v0.2.11
 	github.com/gofiber/fiber/v2 v2.52.5
+	github.com/google/uuid v1.6.0
 	gorm.io/gorm v1.31.1
 )
 
@@ -17,7 +18,6 @@ require (
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/go-playground/validator/v10 v10.22.0 // indirect
 	github.com/golang-jwt/jwt/v5 v5.2.1 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/pgx/v5 v5.6.0 // indirect

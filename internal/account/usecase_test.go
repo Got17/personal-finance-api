@@ -225,3 +225,187 @@ func TestListAccounts_Isolation(t *testing.T) {
 		t.Fatalf("expected non-nil empty slice for user-3, got %#v", user3Accounts)
 	}
 }
+
+func (m *mockAccountRepo) Update(_ context.Context, entity *account.Account) error {
+	m.accounts[entity.ID] = entity
+	return nil
+}
+
+func TestUpdateAccount_Success(t *testing.T) {
+	repo := newMockAccountRepo()
+	uc := account.NewAccountUsecase(repo)
+
+	created, err := uc.CreateAccount(context.Background(), "user-123", &account.CreateAccountInput{
+		Name:        "Old Name",
+		Type:        "checking",
+		Currency:    "USD",
+		Description: "Old desc",
+	})
+	if err != nil {
+		t.Fatalf("create failed: %v", err)
+	}
+
+	newName := "New Name"
+	newType := "savings"
+	newCurr := "EUR"
+	newDesc := "New desc"
+	active := false
+
+	updated, err := uc.UpdateAccount(context.Background(), "user-123", created.ID, &account.UpdateAccountInput{
+		Name:        &newName,
+		Type:        &newType,
+		Currency:    &newCurr,
+		Description: &newDesc,
+		IsActive:    &active,
+	})
+	if err != nil {
+		t.Fatalf("update failed: %v", err)
+	}
+
+	if updated.Name != newName || updated.Type != newType || updated.Currency != newCurr || updated.Description != newDesc || updated.IsActive != false {
+		t.Fatalf("unexpected updated entity: %#v", updated)
+	}
+}
+
+func TestUpdateAccount_NotFound(t *testing.T) {
+	repo := newMockAccountRepo()
+	uc := account.NewAccountUsecase(repo)
+
+	newName := "New Name"
+	_, err := uc.UpdateAccount(context.Background(), "user-123", "non-existent-id", &account.UpdateAccountInput{
+		Name: &newName,
+	})
+	if err == nil {
+		t.Fatal("expected error for non-existent account, got nil")
+	}
+
+	ae, ok := errs.IsAppError(err)
+	if !ok || ae.Status != 404 {
+		t.Fatalf("expected 404 AppError, got %#v", err)
+	}
+}
+
+func TestUpdateAccount_AccessDenied(t *testing.T) {
+	repo := newMockAccountRepo()
+	uc := account.NewAccountUsecase(repo)
+
+	created, err := uc.CreateAccount(context.Background(), "user-1", &account.CreateAccountInput{
+		Name: "User 1 Account", Type: "checking", Currency: "USD",
+	})
+	if err != nil {
+		t.Fatalf("create failed: %v", err)
+	}
+
+	newName := "Hacked Name"
+	_, err = uc.UpdateAccount(context.Background(), "user-2", created.ID, &account.UpdateAccountInput{
+		Name: &newName,
+	})
+	if err == nil {
+		t.Fatal("expected error when user-2 tries to update user-1 account, got nil")
+	}
+
+	ae, ok := errs.IsAppError(err)
+	if !ok || ae.Status != 403 {
+		t.Fatalf("expected 403 AppError, got %#v", err)
+	}
+}
+
+func TestUpdateAccount_ValidationFailed(t *testing.T) {
+	repo := newMockAccountRepo()
+	uc := account.NewAccountUsecase(repo)
+
+	created, err := uc.CreateAccount(context.Background(), "user-123", &account.CreateAccountInput{
+		Name: "Valid Account", Type: "checking", Currency: "USD",
+	})
+	if err != nil {
+		t.Fatalf("create failed: %v", err)
+	}
+
+	invalidType := "invalid_type_xyz"
+	_, err = uc.UpdateAccount(context.Background(), "user-123", created.ID, &account.UpdateAccountInput{
+		Type: &invalidType,
+	})
+	if err == nil {
+		t.Fatal("expected 422 error for invalid type, got nil")
+	}
+
+	ae, ok := errs.IsAppError(err)
+	if !ok || ae.Status != 422 {
+		t.Fatalf("expected 422 AppError, got %#v", err)
+	}
+
+	invalidCurrency := "BAD"
+	_, err = uc.UpdateAccount(context.Background(), "user-123", created.ID, &account.UpdateAccountInput{
+		Currency: &invalidCurrency,
+	})
+	if err == nil {
+		t.Fatal("expected 422 error for invalid currency, got nil")
+	}
+
+	emptyName := "   "
+	_, err = uc.UpdateAccount(context.Background(), "user-123", created.ID, &account.UpdateAccountInput{
+		Name: &emptyName,
+	})
+	if err == nil {
+		t.Fatal("expected 422 error for empty name, got nil")
+	}
+}
+
+func TestDeactivateAccount_Success(t *testing.T) {
+	repo := newMockAccountRepo()
+	uc := account.NewAccountUsecase(repo)
+
+	created, err := uc.CreateAccount(context.Background(), "user-123", &account.CreateAccountInput{
+		Name: "Active Account", Type: "checking", Currency: "USD",
+	})
+	if err != nil {
+		t.Fatalf("create failed: %v", err)
+	}
+
+	deactivated, err := uc.DeactivateAccount(context.Background(), "user-123", created.ID)
+	if err != nil {
+		t.Fatalf("deactivate failed: %v", err)
+	}
+
+	if deactivated.IsActive != false {
+		t.Fatalf("expected IsActive to be false, got true")
+	}
+}
+
+func TestDeactivateAccount_AccessDenied(t *testing.T) {
+	repo := newMockAccountRepo()
+	uc := account.NewAccountUsecase(repo)
+
+	created, err := uc.CreateAccount(context.Background(), "user-1", &account.CreateAccountInput{
+		Name: "User 1 Account", Type: "checking", Currency: "USD",
+	})
+	if err != nil {
+		t.Fatalf("create failed: %v", err)
+	}
+
+	_, err = uc.DeactivateAccount(context.Background(), "user-2", created.ID)
+	if err == nil {
+		t.Fatal("expected error for user-2 deactivating user-1 account, got nil")
+	}
+
+	ae, ok := errs.IsAppError(err)
+	if !ok || ae.Status != 403 {
+		t.Fatalf("expected 403 AppError, got %#v", err)
+	}
+}
+
+func TestDeactivateAccount_NotFound(t *testing.T) {
+	repo := newMockAccountRepo()
+	uc := account.NewAccountUsecase(repo)
+
+	_, err := uc.DeactivateAccount(context.Background(), "user-123", "non-existent-id")
+	if err == nil {
+		t.Fatal("expected error for non-existent account deactivation, got nil")
+	}
+
+	ae, ok := errs.IsAppError(err)
+	if !ok || ae.Status != 404 {
+		t.Fatalf("expected 404 AppError, got %#v", err)
+	}
+}
+
