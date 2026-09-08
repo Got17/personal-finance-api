@@ -497,6 +497,98 @@ func TestConfiguredApp_CreateAndListCategories(t *testing.T) {
 	}
 }
 
+func TestConfiguredApp_UpdateAndDeactivateCategory(t *testing.T) {
+	token := jwt.New(config.JWT{Secret: "test-secret"})
+	userRepo := &multiUserRepoMock{
+		users: map[string]*user.User{
+			"user-1": {ID: "user-1", Email: "user1@example.com"},
+			"user-2": {ID: "user-2", Email: "user2@example.com"},
+		},
+	}
+	wsRepo := &mainTestWorkspaceRepo{}
+	acctRepo := &mainTestAccountRepo{}
+	catRepo := &mainTestCategoryRepo{}
+
+	uHandler := user.NewUserHandler(user.NewUserUsecase(userRepo, token))
+	wHandler := workspace.NewWorkspaceHandler(workspace.NewWorkspaceUsecase(wsRepo))
+	acctHandler := account.NewAccountHandler(account.NewAccountUsecase(acctRepo))
+	catHandler := category.NewCategoryHandler(category.NewCategoryUsecase(catRepo))
+	app := newAPIApp("personal-finance-api", uHandler, wHandler, acctHandler, catHandler, token)
+
+	token1, _ := token.Sign(map[string]any{"sub": "user-1"}, time.Hour)
+	token2, _ := token.Sign(map[string]any{"sub": "user-2"}, time.Hour)
+
+	// 1. Create category as user 1
+	createReq := httptest.NewRequest("POST", "/v1/categories", bytes.NewBufferString(`{"name":"Initial Category","type":"income"}`))
+	createReq.Header.Set("Authorization", "Bearer "+token1)
+	createReq.Header.Set("Content-Type", "application/json")
+	createResp, err := app.Test(createReq, 5000)
+	if err != nil {
+		t.Fatalf("create category failed: %v", err)
+	}
+	defer createResp.Body.Close()
+
+	var createBody struct {
+		Data category.Category `json:"data"`
+	}
+	_ = json.NewDecoder(createResp.Body).Decode(&createBody)
+	catID := createBody.Data.ID
+
+	// 2. User 2 attempts to update User 1's category -> 403 Forbidden
+	updateReqForbidden := httptest.NewRequest("PATCH", "/v1/categories/"+catID, bytes.NewBufferString(`{"name":"Hacked"}`))
+	updateReqForbidden.Header.Set("Authorization", "Bearer "+token2)
+	updateReqForbidden.Header.Set("Content-Type", "application/json")
+	updateRespForbidden, err := app.Test(updateReqForbidden, 5000)
+	if err != nil {
+		t.Fatalf("forbidden category update request failed: %v", err)
+	}
+	defer updateRespForbidden.Body.Close()
+	if updateRespForbidden.StatusCode != 403 {
+		t.Fatalf("status = %d, want 403 Forbidden", updateRespForbidden.StatusCode)
+	}
+
+	// 3. User 1 updates their category -> 200 OK
+	updateReq := httptest.NewRequest("PATCH", "/v1/categories/"+catID, bytes.NewBufferString(`{"name":"Updated Category","type":"expense"}`))
+	updateReq.Header.Set("Authorization", "Bearer "+token1)
+	updateReq.Header.Set("Content-Type", "application/json")
+	updateResp, err := app.Test(updateReq, 5000)
+	if err != nil {
+		t.Fatalf("update category request failed: %v", err)
+	}
+	defer updateResp.Body.Close()
+	if updateResp.StatusCode != 200 {
+		t.Fatalf("update status = %d, want 200 OK", updateResp.StatusCode)
+	}
+
+	var updateBody struct {
+		Data category.Category `json:"data"`
+	}
+	_ = json.NewDecoder(updateResp.Body).Decode(&updateBody)
+	if updateBody.Data.Name != "Updated Category" || updateBody.Data.Type != category.CategoryTypeExpense {
+		t.Fatalf("unexpected updated category data: %#v", updateBody.Data)
+	}
+
+	// 4. User 1 deactivates their category -> 200 OK
+	deactivateReq := httptest.NewRequest("DELETE", "/v1/categories/"+catID, nil)
+	deactivateReq.Header.Set("Authorization", "Bearer "+token1)
+	deactivateResp, err := app.Test(deactivateReq, 5000)
+	if err != nil {
+		t.Fatalf("deactivate category request failed: %v", err)
+	}
+	defer deactivateResp.Body.Close()
+	if deactivateResp.StatusCode != 200 {
+		t.Fatalf("deactivate status = %d, want 200 OK", deactivateResp.StatusCode)
+	}
+
+	var deactivateBody struct {
+		Data category.Category `json:"data"`
+	}
+	_ = json.NewDecoder(deactivateResp.Body).Decode(&deactivateBody)
+	if deactivateBody.Data.IsActive != false {
+		t.Fatalf("expected IsActive to be false, got true")
+	}
+}
+
 type mainTestCategoryRepo struct {
 	categories map[string]*category.Category
 }
@@ -517,6 +609,22 @@ func (m *mainTestCategoryRepo) FindByUserID(_ context.Context, userID string) ([
 		}
 	}
 	return list, nil
+}
+
+func (m *mainTestCategoryRepo) FindByID(_ context.Context, id string) (*category.Category, error) {
+	cat, ok := m.categories[id]
+	if !ok {
+		return nil, category.ErrCategoryNotFound
+	}
+	return cat, nil
+}
+
+func (m *mainTestCategoryRepo) Update(_ context.Context, entity *category.Category) error {
+	if m.categories == nil {
+		m.categories = make(map[string]*category.Category)
+	}
+	m.categories[entity.ID] = entity
+	return nil
 }
 
 type mainTestAccountRepo struct {
