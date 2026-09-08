@@ -43,4 +43,3 @@ func (r *accountRepository) FindByID(ctx context.Context, id string) (*Account, 
 func (r *accountRepository) Update(ctx context.Context, entity *Account) error {
 	return r.db.Session(ctx).Save(entity).Error
 }
-

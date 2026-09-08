@@ -11,28 +11,39 @@ var (
 	ErrAccessDenied    = errors.New("access denied to account")
 )
 
-// SupportedAccountTypes defines valid account categories in personal finance.
-var SupportedAccountTypes = map[string]bool{
-	"checking":    true,
-	"savings":     true,
-	"credit_card": true,
-	"investment":  true,
-	"cash":        true,
-	"loan":        true,
-	"other":       true,
+type AccountType string
+
+const (
+	AccountTypeChecking   AccountType = "checking"
+	AccountTypeSavings    AccountType = "savings"
+	AccountTypeCreditCard AccountType = "credit_card"
+	AccountTypeInvestment AccountType = "investment"
+	AccountTypeCash       AccountType = "cash"
+	AccountTypeLoan       AccountType = "loan"
+	AccountTypeOther      AccountType = "other"
+)
+
+var SupportedAccountTypes = map[AccountType]bool{
+	AccountTypeChecking:   true,
+	AccountTypeSavings:    true,
+	AccountTypeCreditCard: true,
+	AccountTypeInvestment: true,
+	AccountTypeCash:       true,
+	AccountTypeLoan:       true,
+	AccountTypeOther:      true,
 }
 
 // Account is the core domain entity.
 type Account struct {
-	ID          string    `json:"id"          gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
-	UserID      string    `json:"user_id"     gorm:"type:uuid;not null;index"`
-	Name        string    `json:"name"        gorm:"not null"`
-	Type        string    `json:"type"        gorm:"not null"`
-	Currency    string    `json:"currency"    gorm:"not null"`
-	Description string    `json:"description" gorm:"type:text"`
-	IsActive    bool      `json:"is_active"   gorm:"not null;default:true"`
-	CreatedAt   time.Time `json:"created_at"  gorm:"autoCreateTime"`
-	UpdatedAt   time.Time `json:"updated_at"  gorm:"autoUpdateTime"`
+	ID          string      `json:"id"          gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
+	UserID      string      `json:"user_id"     gorm:"type:uuid;not null;index"`
+	Name        string      `json:"name"        gorm:"not null"`
+	Type        AccountType `json:"type"        gorm:"type:account_type;not null"`
+	Currency    string      `json:"currency"    gorm:"not null"`
+	Description string      `json:"description" gorm:"type:text"`
+	IsActive    bool        `json:"is_active"   gorm:"not null;default:true"`
+	CreatedAt   time.Time   `json:"created_at"  gorm:"autoCreateTime"`
+	UpdatedAt   time.Time   `json:"updated_at"  gorm:"autoUpdateTime"`
 }
 
 // TableName sets the PostgreSQL table name.
@@ -53,4 +64,3 @@ type AccountUsecase interface {
 	UpdateAccount(ctx context.Context, userID string, accountID string, input *UpdateAccountInput) (*Account, error)
 	DeactivateAccount(ctx context.Context, userID string, accountID string) (*Account, error)
 }
-

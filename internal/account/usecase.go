@@ -40,7 +40,7 @@ func NewAccountUsecase(repo AccountRepository) AccountUsecase {
 
 // IsValidAccountType checks whether the given type is a supported account type.
 func IsValidAccountType(acctType string) bool {
-	return SupportedAccountTypes[strings.ToLower(strings.TrimSpace(acctType))]
+	return SupportedAccountTypes[AccountType(strings.ToLower(strings.TrimSpace(acctType)))]
 }
 
 func (u *accountUsecase) CreateAccount(ctx context.Context, userID string, input *CreateAccountInput) (*Account, error) {
@@ -82,7 +82,7 @@ func (u *accountUsecase) CreateAccount(ctx context.Context, userID string, input
 		ID:          uuid.NewString(),
 		UserID:      userID,
 		Name:        name,
-		Type:        acctType,
+		Type:        AccountType(acctType),
 		Currency:    currency,
 		Description: strings.TrimSpace(input.Description),
 		IsActive:    isActive,
@@ -154,7 +154,7 @@ func (u *accountUsecase) UpdateAccount(ctx context.Context, userID string, accou
 				"type": "unsupported account type",
 			})
 		}
-		acct.Type = acctType
+		acct.Type = AccountType(acctType)
 	}
 
 	if input.Currency != nil {
@@ -211,4 +211,3 @@ func (u *accountUsecase) DeactivateAccount(ctx context.Context, userID string, a
 
 	return acct, nil
 }
-

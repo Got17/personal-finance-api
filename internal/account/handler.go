@@ -25,7 +25,6 @@ func (h *AccountHandler) RegisterRoutes(r fiber.Router) {
 	accounts.Delete("/:id", h.DeactivateAccount)
 }
 
-
 func (h *AccountHandler) CreateAccount(c *fiber.Ctx) error {
 	userID := httputil.GetUserID(c)
 	if userID == "" {
@@ -95,4 +94,3 @@ func (h *AccountHandler) DeactivateAccount(c *fiber.Ctx) error {
 
 	return c.JSON(response.Success(result))
 }
-

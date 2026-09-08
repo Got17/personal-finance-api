@@ -693,6 +693,7 @@ components:
         type:
           type: string
           example: checking
+          enum: [checking, savings, credit_card, investment, cash, loan, other]
         currency:
           type: string
           example: USD
