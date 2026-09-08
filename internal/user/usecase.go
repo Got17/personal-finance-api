@@ -193,7 +193,7 @@ func (u *userUsecase) UpdatePreferences(ctx context.Context, userID string, inpu
 
 	currency := strings.ToUpper(strings.TrimSpace(input.BaseCurrency))
 	if !IsValidISO4217(currency) {
-		return nil, errs.UnprocessableFields(messages.MsgValidationFailed, map[string]string{"base_currency": "invalid currency code"})
+		return nil, errs.UnprocessableFields(messages.MsgValidationFailed, map[string]string{"base_currency": messages.MsgInvalidCurrencyCode})
 	}
 
 	updatedUser, err := u.repo.UpdateBaseCurrency(ctx, userID, currency)

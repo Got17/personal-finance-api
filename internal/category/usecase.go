@@ -42,14 +42,14 @@ func (u *categoryUsecase) CreateCategory(ctx context.Context, userID string, inp
 	catType := strings.ToLower(strings.TrimSpace(input.Type))
 	if !IsValidCategoryType(catType) {
 		return nil, errs.UnprocessableFields(messages.MsgValidationFailed, map[string]string{
-			"type": "unsupported category type",
+			"type": messages.MsgUnsupportedCategoryType,
 		})
 	}
 
 	name := strings.TrimSpace(input.Name)
 	if name == "" {
 		return nil, errs.UnprocessableFields(messages.MsgValidationFailed, map[string]string{
-			"name": "name is required",
+			"name": messages.MsgNameIsRequired,
 		})
 	}
 
