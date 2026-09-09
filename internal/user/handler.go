@@ -35,8 +35,6 @@ func (h *UserHandler) RegisterProtectedRoutes(r fiber.Router) {
 	prefs.Patch("/", h.UpdatePreferences)
 }
 
-
-
 func (h *UserHandler) SignIn(c *fiber.Ctx) error {
 	var input SignInInput
 	if err := c.BodyParser(&input); err != nil {

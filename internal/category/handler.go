@@ -20,6 +20,9 @@ func (h *CategoryHandler) RegisterRoutes(r fiber.Router) {
 	categories := r.Group("/categories")
 	categories.Post("/", h.CreateCategory)
 	categories.Get("/", h.ListCategories)
+	categories.Put("/:id", h.UpdateCategory)
+	categories.Patch("/:id", h.UpdateCategory)
+	categories.Delete("/:id", h.DeactivateCategory)
 }
 
 func (h *CategoryHandler) CreateCategory(c *fiber.Ctx) error {
@@ -53,4 +56,41 @@ func (h *CategoryHandler) ListCategories(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(response.Success(categories))
+}
+
+func (h *CategoryHandler) UpdateCategory(c *fiber.Ctx) error {
+	userID := httputil.GetUserID(c)
+	if userID == "" {
+		return httputil.RespondUnauthorized(c)
+	}
+
+	categoryID := c.Params("id")
+
+	var input UpdateCategoryInput
+	if err := c.BodyParser(&input); err != nil {
+		return httputil.RespondBadRequest(c)
+	}
+
+	result, err := h.usecase.UpdateCategory(c.Context(), userID, categoryID, &input)
+	if err != nil {
+		return httputil.RespondError(c, err)
+	}
+
+	return c.JSON(response.Success(result))
+}
+
+func (h *CategoryHandler) DeactivateCategory(c *fiber.Ctx) error {
+	userID := httputil.GetUserID(c)
+	if userID == "" {
+		return httputil.RespondUnauthorized(c)
+	}
+
+	categoryID := c.Params("id")
+
+	result, err := h.usecase.DeactivateCategory(c.Context(), userID, categoryID)
+	if err != nil {
+		return httputil.RespondError(c, err)
+	}
+
+	return c.JSON(response.Success(result))
 }

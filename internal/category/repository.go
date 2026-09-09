@@ -2,6 +2,9 @@ package category
 
 import (
 	"context"
+	"errors"
+
+	"gorm.io/gorm"
 
 	"github.com/BounkhongDev/bkgo/contract"
 )
@@ -24,4 +27,19 @@ func (r *categoryRepository) FindByUserID(ctx context.Context, userID string) ([
 		return nil, err
 	}
 	return list, nil
+}
+
+func (r *categoryRepository) FindByID(ctx context.Context, id string) (*Category, error) {
+	var entity Category
+	if err := r.db.Session(ctx).First(&entity, "id = ?", id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrCategoryNotFound
+		}
+		return nil, err
+	}
+	return &entity, nil
+}
+
+func (r *categoryRepository) Update(ctx context.Context, entity *Category) error {
+	return r.db.Session(ctx).Save(entity).Error
 }

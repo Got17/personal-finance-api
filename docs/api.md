@@ -281,6 +281,63 @@ Successful responses return `200 OK` with an array of categories:
 }
 ```
 
+### `PUT /v1/categories/:id` & `PATCH /v1/categories/:id`
+
+Updates mutable details of an existing category belonging strictly to the currently authenticated user.
+Requires a valid Bearer token. Callers can only update their own categories (cross-user updates return `403 Forbidden`).
+Accepts optional fields `name`, `type` (`income` or `expense`), and `is_active`.
+Invalid input or unsupported category type returns `422 Unprocessable Entity`.
+If the category ID does not exist, returns `404 Not Found`.
+
+```json
+{
+  "name": "Freelance Work",
+  "type": "income"
+}
+```
+
+Successful responses return `200 OK` with the updated category:
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "e8b9f000-5d1c-4fe9-cc7e-7cc0ce491b33",
+    "user_id": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+    "name": "Freelance Work",
+    "type": "income",
+    "is_active": true,
+    "created_at": "2026-09-08T12:00:00Z",
+    "updated_at": "2026-09-08T12:00:00Z"
+  },
+  "message": ""
+}
+```
+
+### `DELETE /v1/categories/:id`
+
+Deactivates a category belonging strictly to the currently authenticated user (`is_active` set to `false`) without erasing the record from the database.
+Requires a valid Bearer token. Callers can only deactivate their own categories (cross-user deactivation returns `403 Forbidden`).
+If the category ID does not exist, returns `404 Not Found`.
+
+Successful responses return `200 OK` with the deactivated category:
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "e8b9f000-5d1c-4fe9-cc7e-7cc0ce491b33",
+    "user_id": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+    "name": "Freelance Work",
+    "type": "income",
+    "is_active": false,
+    "created_at": "2026-09-08T12:00:00Z",
+    "updated_at": "2026-09-08T12:00:00Z"
+  },
+  "message": ""
+}
+```
+
 ## Health
 
 

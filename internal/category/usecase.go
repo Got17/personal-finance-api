@@ -2,6 +2,7 @@ package category
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	"github.com/google/uuid"
@@ -16,6 +17,12 @@ type CreateCategoryInput struct {
 	Name     string `json:"name"      validate:"required,min=1,max=100"`
 	Type     string `json:"type"      validate:"required"`
 	IsActive *bool  `json:"is_active" validate:"omitempty"`
+}
+
+type UpdateCategoryInput struct {
+	Name     *string `json:"name"      validate:"omitempty,min=1,max=100"`
+	Type     *string `json:"type"      validate:"omitempty"`
+	IsActive *bool   `json:"is_active" validate:"omitempty"`
 }
 
 type categoryUsecase struct {
@@ -88,4 +95,90 @@ func (u *categoryUsecase) ListCategories(ctx context.Context, userID string) ([]
 	}
 
 	return categories, nil
+}
+
+func (u *categoryUsecase) UpdateCategory(ctx context.Context, userID string, categoryID string, input *UpdateCategoryInput) (*Category, error) {
+	if strings.TrimSpace(userID) == "" {
+		return nil, errs.Unauthorized(messages.MsgUserNotFound)
+	}
+
+	if strings.TrimSpace(categoryID) == "" {
+		return nil, errs.NotFound(messages.MsgCategoryNotFound)
+	}
+
+	cat, err := u.repo.FindByID(ctx, categoryID)
+	if err != nil {
+		if errors.Is(err, ErrCategoryNotFound) {
+			return nil, errs.NotFound(messages.MsgCategoryNotFound)
+		}
+		return nil, err
+	}
+
+	if cat.UserID != userID {
+		return nil, errs.Forbidden(messages.MsgCategoryAccessDenied)
+	}
+
+	if fieldErrs := validator.Validate(input); len(fieldErrs) > 0 {
+		return nil, errs.UnprocessableFields(messages.MsgValidationFailed, fieldErrs)
+	}
+
+	if input.Name != nil {
+		name := strings.TrimSpace(*input.Name)
+		if name == "" {
+			return nil, errs.UnprocessableFields(messages.MsgValidationFailed, map[string]string{
+				"name": messages.MsgNameIsRequired,
+			})
+		}
+		cat.Name = name
+	}
+
+	if input.Type != nil {
+		catType := strings.ToLower(strings.TrimSpace(*input.Type))
+		if !IsValidCategoryType(catType) {
+			return nil, errs.UnprocessableFields(messages.MsgValidationFailed, map[string]string{
+				"type": messages.MsgUnsupportedCategoryType,
+			})
+		}
+		cat.Type = CategoryType(catType)
+	}
+
+	if input.IsActive != nil {
+		cat.IsActive = *input.IsActive
+	}
+
+	if err := u.repo.Update(ctx, cat); err != nil {
+		return nil, err
+	}
+
+	return cat, nil
+}
+
+func (u *categoryUsecase) DeactivateCategory(ctx context.Context, userID string, categoryID string) (*Category, error) {
+	if strings.TrimSpace(userID) == "" {
+		return nil, errs.Unauthorized(messages.MsgUserNotFound)
+	}
+
+	if strings.TrimSpace(categoryID) == "" {
+		return nil, errs.NotFound(messages.MsgCategoryNotFound)
+	}
+
+	cat, err := u.repo.FindByID(ctx, categoryID)
+	if err != nil {
+		if errors.Is(err, ErrCategoryNotFound) {
+			return nil, errs.NotFound(messages.MsgCategoryNotFound)
+		}
+		return nil, err
+	}
+
+	if cat.UserID != userID {
+		return nil, errs.Forbidden(messages.MsgCategoryAccessDenied)
+	}
+
+	cat.IsActive = false
+
+	if err := u.repo.Update(ctx, cat); err != nil {
+		return nil, err
+	}
+
+	return cat, nil
 }

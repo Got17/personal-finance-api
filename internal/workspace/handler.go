@@ -22,7 +22,6 @@ func (h *WorkspaceHandler) RegisterRoutes(r fiber.Router) {
 	workspaces.Get("/:id", h.GetWorkspace)
 }
 
-
 func (h *WorkspaceHandler) ListWorkspaces(c *fiber.Ctx) error {
 	userID := httputil.GetUserID(c)
 	if userID == "" {
