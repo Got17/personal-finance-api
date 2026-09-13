@@ -113,13 +113,14 @@ func (u *financialRecordUsecase) ListFinancialRecords(ctx context.Context, userI
 	if filter.Kind != "" && !IsValidKind(string(filter.Kind)) {
 		return nil, validationError("kind", messages.MsgUnsupportedFinancialRecordKind)
 	}
-	if filter.StartDate != nil && filter.EndDate != nil && filter.StartDate.After(*filter.EndDate) {
-		return nil, validationError("date", messages.MsgInvalidDateRange)
-	}
 	if filter.EndDate != nil {
 		filter.EndDate = inclusiveEndDate(filter.EndDate)
 	}
+	if filter.StartDate != nil && filter.EndDate != nil && filter.StartDate.After(*filter.EndDate) {
+		return nil, validationError("date", messages.MsgInvalidDateRange)
+	}
 	records, err := u.records.FindByUserID(ctx, userID, filter)
+
 	if err != nil {
 		return nil, err
 	}
@@ -249,11 +250,15 @@ func updateValues(record *FinancialRecord, input *UpdateFinancialRecordInput) (K
 	return kind, accountID, categoryID, amountMinor, currency, date, note
 }
 
+// inclusiveEndDate expands a date boundary to the final microsecond of that day
+// so that date <= queries match all records created up to 23:59:59.999999 on the requested date,
+// respecting PostgreSQL microsecond timestamp precision.
 func inclusiveEndDate(value *time.Time) *time.Time {
 	if value == nil {
 		return nil
 	}
-	inclusive := value.AddDate(0, 0, 1).Add(-time.Nanosecond)
+	inclusive := value.AddDate(0, 0, 1).Add(-time.Microsecond)
 	return &inclusive
 }
+
 

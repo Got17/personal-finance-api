@@ -101,6 +101,21 @@ func TestListFinancialRecords_EndDateIncludesEntireRequestedDay(t *testing.T) {
 	}
 }
 
+func TestListFinancialRecords_RejectsInvertedDateRange(t *testing.T) {
+	uc := financialrecord.NewFinancialRecordUsecase(&filteredRecords{}, accounts{}, categories{})
+	start := time.Date(2026, 9, 12, 0, 0, 0, 0, time.UTC)
+	end := time.Date(2026, 9, 10, 0, 0, 0, 0, time.UTC)
+	_, err := uc.ListFinancialRecords(context.Background(), "user-1", financialrecord.ListFilter{StartDate: &start, EndDate: &end})
+	if err == nil {
+		t.Fatal("expected inverted date range validation error")
+	}
+	appError, ok := errs.IsAppError(err)
+	if !ok || appError.Status != 422 {
+		t.Fatalf("error = %#v, want 422", err)
+	}
+}
+
+
 
 func TestCreateFinancialRecord_RejectsForeignAndInvalidReferences(t *testing.T) {
 	date := time.Date(2026, time.September, 10, 0, 0, 0, 0, time.UTC)
