@@ -45,20 +45,6 @@ func main() {
 	}
 	defer db.Close()
 
-	if err := db.Raw().Exec(`CREATE EXTENSION IF NOT EXISTS pgcrypto`).Error; err != nil {
-		slog.Error("enable pgcrypto extension failed", "error", err)
-		os.Exit(1)
-	}
-
-	if err := db.Raw().Exec(`DO $ BEGIN
-		IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'financial_record_kind') THEN
-			CREATE TYPE financial_record_kind AS ENUM ('income', 'expense');
-		END IF;
-	END ;`).Error; err != nil {
-		slog.Error("create financial record enum type failed", "error", err)
-		os.Exit(1)
-	}
-
 	if err := db.Raw().AutoMigrate(&user.User{}, &workspace.Workspace{}, &account.Account{}, &category.Category{}, &financialrecord.FinancialRecord{}); err != nil {
 		slog.Error("automigrate failed", "error", err)
 		os.Exit(1)
