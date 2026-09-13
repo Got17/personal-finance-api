@@ -20,7 +20,7 @@ var supportedKinds = map[Kind]bool{KindIncome: true, KindExpense: true}
 type FinancialRecord struct {
 	ID          string    `json:"id"           gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
 	UserID      string    `json:"user_id"      gorm:"type:uuid;not null;index"`
-	Kind        Kind      `json:"kind"         gorm:"type:financial_record_kind;not null"`
+	Kind        Kind      `json:"kind"         gorm:"not null"`
 	AccountID   string    `json:"account_id"   gorm:"type:uuid;not null;index"`
 	CategoryID  string    `json:"category_id"  gorm:"type:uuid;not null;index"`
 	AmountMinor int64     `json:"amount_minor" gorm:"not null"`
