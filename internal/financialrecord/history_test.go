@@ -85,6 +85,23 @@ func TestListFinancialRecords_FiltersOwnerHistoryAndDefaultsToActive(t *testing.
 	}
 }
 
+func TestListFinancialRecords_EndDateIncludesEntireRequestedDay(t *testing.T) {
+	repo := &filteredRecords{items: []*financialrecord.FinancialRecord{
+		{ID: "included", UserID: "user-1", Kind: financialrecord.KindIncome, Date: time.Date(2026, 9, 10, 23, 59, 59, 0, time.UTC), IsActive: true},
+		{ID: "excluded", UserID: "user-1", Kind: financialrecord.KindIncome, Date: time.Date(2026, 9, 11, 0, 0, 0, 0, time.UTC), IsActive: true},
+	}}
+	uc := financialrecord.NewFinancialRecordUsecase(repo, accounts{}, categories{})
+	endDate := time.Date(2026, 9, 10, 0, 0, 0, 0, time.UTC)
+	records, err := uc.ListFinancialRecords(context.Background(), "user-1", financialrecord.ListFilter{EndDate: &endDate})
+	if err != nil {
+		t.Fatalf("ListFinancialRecords() error = %v", err)
+	}
+	if len(records) != 1 || records[0].ID != "included" {
+		t.Fatalf("records = %#v, want only included record", records)
+	}
+}
+
+
 func TestCreateFinancialRecord_RejectsForeignAndInvalidReferences(t *testing.T) {
 	date := time.Date(2026, time.September, 10, 0, 0, 0, 0, time.UTC)
 	validCategory := &category.Category{ID: "category-1", UserID: "user-1", Type: category.CategoryTypeExpense, IsActive: true}

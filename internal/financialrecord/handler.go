@@ -82,7 +82,7 @@ func listFilter(c *fiber.Ctx) (ListFilter, error) {
 	if err != nil {
 		return ListFilter{}, err
 	}
-	filter.EndDate = inclusiveEndDate(endDate)
+	filter.EndDate = endDate
 	includeArchived := c.Query("include_archived")
 	if includeArchived == "" {
 		return filter, nil
@@ -130,10 +130,3 @@ func (h *FinancialRecordHandler) ArchiveFinancialRecord(c *fiber.Ctx) error {
 	return c.JSON(response.Success(record))
 }
 
-func inclusiveEndDate(value *time.Time) *time.Time {
-	if value == nil {
-		return nil
-	}
-	inclusive := value.AddDate(0, 0, 1).Add(-time.Nanosecond)
-	return &inclusive
-}

@@ -116,6 +116,9 @@ func (u *financialRecordUsecase) ListFinancialRecords(ctx context.Context, userI
 	if filter.StartDate != nil && filter.EndDate != nil && filter.StartDate.After(*filter.EndDate) {
 		return nil, validationError("date", messages.MsgInvalidDateRange)
 	}
+	if filter.EndDate != nil {
+		filter.EndDate = inclusiveEndDate(filter.EndDate)
+	}
 	records, err := u.records.FindByUserID(ctx, userID, filter)
 	if err != nil {
 		return nil, err
@@ -125,6 +128,7 @@ func (u *financialRecordUsecase) ListFinancialRecords(ctx context.Context, userI
 	}
 	return records, nil
 }
+
 
 func (u *financialRecordUsecase) findOwnedActiveAccount(ctx context.Context, userID string, accountID string) (*account.Account, error) {
 	acct, err := u.accounts.GetAccount(ctx, userID, strings.TrimSpace(accountID))
@@ -244,3 +248,12 @@ func updateValues(record *FinancialRecord, input *UpdateFinancialRecordInput) (K
 	}
 	return kind, accountID, categoryID, amountMinor, currency, date, note
 }
+
+func inclusiveEndDate(value *time.Time) *time.Time {
+	if value == nil {
+		return nil
+	}
+	inclusive := value.AddDate(0, 0, 1).Add(-time.Nanosecond)
+	return &inclusive
+}
+
