@@ -22,6 +22,9 @@ func (h *FinancialRecordHandler) RegisterRoutes(r fiber.Router) {
 	records.Post("/", h.CreateFinancialRecord)
 	records.Get("/", h.ListFinancialRecords)
 	records.Get("/:id", h.GetFinancialRecord)
+	records.Put("/:id", h.UpdateFinancialRecord)
+	records.Patch("/:id", h.UpdateFinancialRecord)
+	records.Delete("/:id", h.ArchiveFinancialRecord)
 }
 
 func (h *FinancialRecordHandler) CreateFinancialRecord(c *fiber.Ctx) error {
@@ -79,7 +82,7 @@ func listFilter(c *fiber.Ctx) (ListFilter, error) {
 	if err != nil {
 		return ListFilter{}, err
 	}
-	filter.EndDate = endDate
+	filter.EndDate = inclusiveEndDate(endDate)
 	includeArchived := c.Query("include_archived")
 	if includeArchived == "" {
 		return filter, nil
@@ -97,4 +100,40 @@ func parseDate(value string) (*time.Time, error) {
 		return nil, err
 	}
 	return &parsed, nil
+}
+
+func (h *FinancialRecordHandler) UpdateFinancialRecord(c *fiber.Ctx) error {
+	userID := httputil.GetUserID(c)
+	if userID == "" {
+		return httputil.RespondUnauthorized(c)
+	}
+	var input UpdateFinancialRecordInput
+	if err := c.BodyParser(&input); err != nil {
+		return httputil.RespondBadRequest(c)
+	}
+	record, err := h.usecase.UpdateFinancialRecord(c.Context(), userID, c.Params("id"), &input)
+	if err != nil {
+		return httputil.RespondError(c, err)
+	}
+	return c.JSON(response.Success(record))
+}
+
+func (h *FinancialRecordHandler) ArchiveFinancialRecord(c *fiber.Ctx) error {
+	userID := httputil.GetUserID(c)
+	if userID == "" {
+		return httputil.RespondUnauthorized(c)
+	}
+	record, err := h.usecase.ArchiveFinancialRecord(c.Context(), userID, c.Params("id"))
+	if err != nil {
+		return httputil.RespondError(c, err)
+	}
+	return c.JSON(response.Success(record))
+}
+
+func inclusiveEndDate(value *time.Time) *time.Time {
+	if value == nil {
+		return nil
+	}
+	inclusive := value.AddDate(0, 0, 1).Add(-time.Nanosecond)
+	return &inclusive
 }

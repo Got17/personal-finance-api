@@ -25,7 +25,7 @@ type FinancialRecord struct {
 	CategoryID  string    `json:"category_id"  gorm:"type:uuid;not null;index"`
 	AmountMinor int64     `json:"amount_minor" gorm:"not null"`
 	Currency    string    `json:"currency"     gorm:"not null"`
-	Date        time.Time `json:"date"         gorm:"type:date;not null;index"`
+	Date        time.Time `json:"date"         gorm:"not null;index"`
 	Note        string    `json:"note"         gorm:"type:text"`
 	IsActive    bool      `json:"is_active"    gorm:"not null;default:true;index"`
 	CreatedAt   time.Time `json:"created_at"   gorm:"autoCreateTime"`
@@ -47,12 +47,15 @@ type FinancialRecordRepository interface {
 	Create(ctx context.Context, record *FinancialRecord) error
 	FindByID(ctx context.Context, id string) (*FinancialRecord, error)
 	FindByUserID(ctx context.Context, userID string, filter ListFilter) ([]*FinancialRecord, error)
+	Update(ctx context.Context, record *FinancialRecord) error
 }
 
 type FinancialRecordUsecase interface {
 	CreateFinancialRecord(ctx context.Context, userID string, input *CreateFinancialRecordInput) (*FinancialRecord, error)
 	GetFinancialRecord(ctx context.Context, userID string, recordID string) (*FinancialRecord, error)
 	ListFinancialRecords(ctx context.Context, userID string, filter ListFilter) ([]*FinancialRecord, error)
+	UpdateFinancialRecord(ctx context.Context, userID string, recordID string, input *UpdateFinancialRecordInput) (*FinancialRecord, error)
+	ArchiveFinancialRecord(ctx context.Context, userID string, recordID string) (*FinancialRecord, error)
 }
 
 func IsValidKind(value string) bool { return supportedKinds[Kind(value)] }

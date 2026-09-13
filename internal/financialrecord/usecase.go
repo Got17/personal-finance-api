@@ -26,6 +26,15 @@ type CreateFinancialRecordInput struct {
 	Note        string    `json:"note"         validate:"omitempty,max=1000"`
 }
 
+type UpdateFinancialRecordInput struct {
+	Kind        *string    `json:"kind"         validate:"omitempty"`
+	AccountID   *string    `json:"account_id"   validate:"omitempty"`
+	CategoryID  *string    `json:"category_id"  validate:"omitempty"`
+	AmountMinor *int64     `json:"amount_minor" validate:"omitempty,gt=0"`
+	Currency    *string    `json:"currency"     validate:"omitempty"`
+	Date        *time.Time `json:"date"         validate:"omitempty"`
+	Note        *string    `json:"note"         validate:"omitempty,max=1000"`
+}
 type financialRecordUsecase struct {
 	records    FinancialRecordRepository
 	accounts   account.AccountRepository
@@ -155,4 +164,93 @@ func (u *financialRecordUsecase) validateCategory(ctx context.Context, userID st
 
 func validationError(field string, message string) error {
 	return errs.UnprocessableFields(messages.MsgValidationFailed, map[string]string{field: message})
+}
+
+func (u *financialRecordUsecase) UpdateFinancialRecord(ctx context.Context, userID string, recordID string, input *UpdateFinancialRecordInput) (*FinancialRecord, error) {
+	if input == nil {
+		return nil, validationError("record", messages.MsgValidationFailed)
+	}
+	if fieldErrs := validator.Validate(input); len(fieldErrs) > 0 {
+		return nil, errs.UnprocessableFields(messages.MsgValidationFailed, fieldErrs)
+	}
+	record, err := u.GetFinancialRecord(ctx, userID, recordID)
+	if err != nil {
+		return nil, err
+	}
+	if !record.IsActive {
+		return nil, validationError("record", messages.MsgFinancialRecordArchived)
+	}
+
+	kind, accountID, categoryID, amountMinor, currency, date, note := updateValues(record, input)
+	if !IsValidKind(string(kind)) {
+		return nil, validationError("kind", messages.MsgUnsupportedFinancialRecordKind)
+	}
+	if amountMinor <= 0 {
+		return nil, validationError("amount_minor", messages.MsgValidationFailed)
+	}
+	if date.IsZero() {
+		return nil, validationError("date", messages.MsgDateIsRequired)
+	}
+	if !user.IsValidISO4217(currency) {
+		return nil, validationError("currency", messages.MsgInvalidCurrencyCode)
+	}
+	account, err := u.findOwnedActiveAccount(ctx, userID, accountID)
+	if err != nil {
+		return nil, err
+	}
+	if account.Currency != currency {
+		return nil, validationError("currency", messages.MsgAccountCurrencyMismatch)
+	}
+	if err := u.validateCategory(ctx, userID, categoryID, kind); err != nil {
+		return nil, err
+	}
+
+	record.Kind, record.AccountID, record.CategoryID = kind, accountID, categoryID
+	record.AmountMinor, record.Currency, record.Date, record.Note = amountMinor, currency, date.UTC(), note
+	if err := u.records.Update(ctx, record); err != nil {
+		return nil, err
+	}
+	return record, nil
+}
+
+func (u *financialRecordUsecase) ArchiveFinancialRecord(ctx context.Context, userID string, recordID string) (*FinancialRecord, error) {
+	record, err := u.GetFinancialRecord(ctx, userID, recordID)
+	if err != nil {
+		return nil, err
+	}
+	if !record.IsActive {
+		return nil, validationError("record", messages.MsgFinancialRecordArchived)
+	}
+	record.IsActive = false
+	if err := u.records.Update(ctx, record); err != nil {
+		return nil, err
+	}
+	return record, nil
+}
+
+func updateValues(record *FinancialRecord, input *UpdateFinancialRecordInput) (Kind, string, string, int64, string, time.Time, string) {
+	kind, accountID, categoryID := record.Kind, record.AccountID, record.CategoryID
+	amountMinor, currency, date, note := record.AmountMinor, record.Currency, record.Date, record.Note
+	if input.Kind != nil {
+		kind = Kind(strings.ToLower(strings.TrimSpace(*input.Kind)))
+	}
+	if input.AccountID != nil {
+		accountID = strings.TrimSpace(*input.AccountID)
+	}
+	if input.CategoryID != nil {
+		categoryID = strings.TrimSpace(*input.CategoryID)
+	}
+	if input.AmountMinor != nil {
+		amountMinor = *input.AmountMinor
+	}
+	if input.Currency != nil {
+		currency = strings.ToUpper(strings.TrimSpace(*input.Currency))
+	}
+	if input.Date != nil {
+		date = input.Date.UTC()
+	}
+	if input.Note != nil {
+		note = strings.TrimSpace(*input.Note)
+	}
+	return kind, accountID, categoryID, amountMinor, currency, date, note
 }

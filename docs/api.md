@@ -378,6 +378,31 @@ date range returns `422`.
 
 Retrieves one Financial Record owned by the authenticated user. Records owned
 by another user return `403`; absent records return `404`.
+
+### `PUT /v1/financial-records/:id` & `PATCH /v1/financial-records/:id`
+
+Corrects an active Financial Record owned by the authenticated user. Every field
+is optional, but the resulting record must still use active, owned Account and
+Category references whose Category type matches `kind`; its currency must match
+the Account currency, `amount_minor` must be positive, and `date` must be valid.
+Archived records are terminal and return `422 Unprocessable Entity` when edited.
+Cross-user requests return `403 Forbidden`.
+
+```json
+{
+  "amount_minor": 4250,
+  "note": "Corrected grocery total"
+}
+```
+
+### `DELETE /v1/financial-records/:id`
+
+Archives an owned Financial Record by setting `is_active` to `false`; it never
+hard-deletes financial history. Archived records remain individually retrievable
+and are returned by history only with `include_archived=true`. Cross-user archive
+requests return `403 Forbidden`; attempting to archive an already archived record
+returns `422 Unprocessable Entity`.
+
 ## Health
 
 

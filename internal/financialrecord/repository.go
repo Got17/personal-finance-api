@@ -55,3 +55,7 @@ func (r *financialRecordRepository) FindByUserID(ctx context.Context, userID str
 	}
 	return records, nil
 }
+
+func (r *financialRecordRepository) Update(ctx context.Context, record *FinancialRecord) error {
+	return r.db.Session(ctx).Save(record).Error
+}

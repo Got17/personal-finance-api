@@ -661,6 +661,86 @@ paths:
         '401': { description: Unauthenticated or invalid token. }
         '403': { description: The record belongs to another user. }
         '404': { description: Financial record not found. }
+    put:
+      operationId: updateFinancialRecord
+      summary: Update an active financial record
+      description: Updates supplied business fields after validating the resulting Account, Category, kind, amount, currency, and date. Archived records cannot be updated.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateFinancialRecordRequest'
+      responses:
+        '200':
+          description: Financial record updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FinancialRecordSuccessResponse'
+        '400': { description: The request body is malformed. }
+        '401': { description: Unauthenticated or invalid token. }
+        '403': { description: The record or a referenced resource belongs to another user. }
+        '404': { description: The record or a referenced resource was not found. }
+        '422': { description: Validation failed or the record is archived. }
+    patch:
+      operationId: patchFinancialRecord
+      summary: Update an active financial record
+      description: Same partial-update behavior as PUT. Archived records cannot be updated.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateFinancialRecordRequest'
+      responses:
+        '200':
+          description: Financial record updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FinancialRecordSuccessResponse'
+        '400': { description: The request body is malformed. }
+        '401': { description: Unauthenticated or invalid token. }
+        '403': { description: The record or a referenced resource belongs to another user. }
+        '404': { description: The record or a referenced resource was not found. }
+        '422': { description: Validation failed or the record is archived. }
+    delete:
+      operationId: archiveFinancialRecord
+      summary: Archive a financial record
+      description: Sets is_active to false without hard-deleting the owned record. Archived records remain retrievable and are included in history only when include_archived is true.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Financial record archived successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FinancialRecordSuccessResponse'
+        '401': { description: Unauthenticated or invalid token. }
+        '403': { description: The record belongs to another user. }
+        '404': { description: Financial record not found. }
+        '422': { description: The record is already archived. }
   /v1/health:
 
     get:
@@ -715,6 +795,17 @@ components:
         category_id: { type: string, format: uuid }
         amount_minor: { type: integer, format: int64, minimum: 1, description: Positive amount in the Account currency's minor units. }
         currency: { type: string, pattern: '^[A-Z]{3}$', description: Must equal the referenced Account currency. }
+        date: { type: string, format: date-time }
+        note: { type: string, maxLength: 1000 }
+    UpdateFinancialRecordRequest:
+      type: object
+      description: Any supplied fields replace their current values; the resulting record must still have active, owned, kind-matched references and the Account currency.
+      properties:
+        kind: { type: string, enum: [income, expense] }
+        account_id: { type: string, format: uuid }
+        category_id: { type: string, format: uuid }
+        amount_minor: { type: integer, format: int64, minimum: 1 }
+        currency: { type: string, pattern: '^[A-Z]{3}$' }
         date: { type: string, format: date-time }
         note: { type: string, maxLength: 1000 }
     FinancialRecordResponse:
