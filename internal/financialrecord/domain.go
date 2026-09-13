@@ -46,15 +46,18 @@ type ListFilter struct {
 	IncludeArchived bool
 }
 
-// AccountReader is the consumer seam required by financial record for account verification.
+// AccountReader decouples record creation and updates from account persistence details,
+// enforcing that account ownership and access validation remain localized in the account module.
 type AccountReader interface {
 	GetAccount(ctx context.Context, userID string, accountID string) (*account.Account, error)
 }
 
-// CategoryReader is the consumer seam required by financial record for category verification.
+// CategoryReader decouples record creation and updates from category persistence details,
+// enforcing that category ownership and access validation remain localized in the category module.
 type CategoryReader interface {
 	GetCategory(ctx context.Context, userID string, categoryID string) (*category.Category, error)
 }
+
 
 type FinancialRecordRepository interface {
 	Create(ctx context.Context, record *FinancialRecord) error
