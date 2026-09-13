@@ -338,6 +338,46 @@ Successful responses return `200 OK` with the deactivated category:
 }
 ```
 
+## Financial Records
+
+### `POST /v1/financial-records`
+
+Creates an active Income or Expense Financial Record for the authenticated user.
+The request requires `kind` (`income` or `expense`), `account_id`, `category_id`,
+positive integer `amount_minor`, `currency`, and an RFC 3339 `date`; `note` is
+optional. `amount_minor` is never a floating-point amount. The Account and
+Category must be active, owned by the caller, and their Category type must
+match `kind`. The request currency must equal the Account currency.
+
+```json
+{
+  "kind": "expense",
+  "account_id": "c7a8e999-4c0b-4ef8-bb6d-6bb9bd380a22",
+  "category_id": "e8b9f000-5d1c-4fe9-cc7e-7cc0ce491b33",
+  "amount_minor": 4250,
+  "currency": "USD",
+  "date": "2026-09-10T00:00:00Z",
+  "note": "Groceries"
+}
+```
+
+Returns `201 Created`. Malformed JSON returns `400`; unauthenticated calls
+return `401`; foreign references return `403`; missing references return `404`;
+and invalid amounts, currencies, dates, inactive references, or mismatched
+Category kinds return `422`.
+
+### `GET /v1/financial-records`
+
+Lists only the caller's records, newest first by record date. It defaults to
+active records. Optional query filters are `start_date`, `end_date` (both
+`YYYY-MM-DD`), `kind`, `account_id`, `category_id`, and
+`include_archived=true`. Invalid query values return `400`; an invalid kind or
+date range returns `422`.
+
+### `GET /v1/financial-records/:id`
+
+Retrieves one Financial Record owned by the authenticated user. Records owned
+by another user return `403`; absent records return `404`.
 ## Health
 
 

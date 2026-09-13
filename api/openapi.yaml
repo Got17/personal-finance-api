@@ -592,6 +592,75 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /v1/financial-records:
+    post:
+      operationId: createFinancialRecord
+      summary: Create an income or expense financial record
+      description: Creates an active record for the authenticated user. The Account and Category must be active, owned by the caller, and match the record kind and currency.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateFinancialRecordRequest'
+      responses:
+        '201':
+          description: Financial record created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FinancialRecordSuccessResponse'
+        '400': { description: The request body is malformed. }
+        '401': { description: Unauthenticated or invalid token. }
+        '403': { description: A referenced account or category belongs to another user. }
+        '404': { description: A referenced account or category was not found. }
+        '422': { description: Validation failed, including inactive or kind-mismatched references and invalid amounts, dates, or currencies. }
+    get:
+      operationId: listFinancialRecords
+      summary: List the authenticated user's financial record history
+      description: Returns active records newest-first by default. Set include_archived to true to include archived records.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/FinancialRecordStartDate'
+        - $ref: '#/components/parameters/FinancialRecordEndDate'
+        - $ref: '#/components/parameters/FinancialRecordKind'
+        - $ref: '#/components/parameters/FinancialRecordAccountID'
+        - $ref: '#/components/parameters/FinancialRecordCategoryID'
+        - $ref: '#/components/parameters/FinancialRecordIncludeArchived'
+      responses:
+        '200':
+          description: Financial record history.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FinancialRecordListSuccessResponse'
+        '400': { description: A query parameter is malformed. }
+        '401': { description: Unauthenticated or invalid token. }
+        '422': { description: The filter combination is invalid. }
+  /v1/financial-records/{id}:
+    get:
+      operationId: getFinancialRecord
+      summary: Retrieve one financial record
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Financial record found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FinancialRecordSuccessResponse'
+        '401': { description: Unauthenticated or invalid token. }
+        '403': { description: The record belongs to another user. }
+        '404': { description: Financial record not found. }
   /v1/health:
 
     get:
@@ -611,7 +680,75 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
+  parameters:
+    FinancialRecordStartDate:
+      name: start_date
+      in: query
+      schema: { type: string, format: date }
+    FinancialRecordEndDate:
+      name: end_date
+      in: query
+      schema: { type: string, format: date }
+    FinancialRecordKind:
+      name: kind
+      in: query
+      schema: { type: string, enum: [income, expense] }
+    FinancialRecordAccountID:
+      name: account_id
+      in: query
+      schema: { type: string, format: uuid }
+    FinancialRecordCategoryID:
+      name: category_id
+      in: query
+      schema: { type: string, format: uuid }
+    FinancialRecordIncludeArchived:
+      name: include_archived
+      in: query
+      schema: { type: boolean, default: false }
   schemas:
+    CreateFinancialRecordRequest:
+      type: object
+      required: [kind, account_id, category_id, amount_minor, currency, date]
+      properties:
+        kind: { type: string, enum: [income, expense] }
+        account_id: { type: string, format: uuid }
+        category_id: { type: string, format: uuid }
+        amount_minor: { type: integer, format: int64, minimum: 1, description: Positive amount in the Account currency's minor units. }
+        currency: { type: string, pattern: '^[A-Z]{3}$', description: Must equal the referenced Account currency. }
+        date: { type: string, format: date-time }
+        note: { type: string, maxLength: 1000 }
+    FinancialRecordResponse:
+      type: object
+      required: [id, user_id, kind, account_id, category_id, amount_minor, currency, date, is_active, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        user_id: { type: string, format: uuid }
+        kind: { type: string, enum: [income, expense] }
+        account_id: { type: string, format: uuid }
+        category_id: { type: string, format: uuid }
+        amount_minor: { type: integer, format: int64, minimum: 1 }
+        currency: { type: string, example: USD }
+        date: { type: string, format: date-time }
+        note: { type: string }
+        is_active: { type: boolean }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    FinancialRecordSuccessResponse:
+      type: object
+      required: [success, data, message]
+      properties:
+        success: { type: boolean, const: true }
+        data: { $ref: '#/components/schemas/FinancialRecordResponse' }
+        message: { type: string }
+    FinancialRecordListSuccessResponse:
+      type: object
+      required: [success, data, message]
+      properties:
+        success: { type: boolean, const: true }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/FinancialRecordResponse' }
+        message: { type: string }
     SignInRequest:
       type: object
       required:

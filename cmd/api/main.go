@@ -18,6 +18,7 @@ import (
 
 	"github.com/Got17/personal-finance-api/internal/account"
 	"github.com/Got17/personal-finance-api/internal/category"
+	"github.com/Got17/personal-finance-api/internal/financialrecord"
 	"github.com/Got17/personal-finance-api/internal/user"
 	"github.com/Got17/personal-finance-api/internal/workspace"
 )
@@ -49,7 +50,16 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := db.Raw().AutoMigrate(&user.User{}, &workspace.Workspace{}, &account.Account{}, &category.Category{}); err != nil {
+	if err := db.Raw().Exec(`DO $ BEGIN
+		IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'financial_record_kind') THEN
+			CREATE TYPE financial_record_kind AS ENUM ('income', 'expense');
+		END IF;
+	END ;`).Error; err != nil {
+		slog.Error("create financial record enum type failed", "error", err)
+		os.Exit(1)
+	}
+
+	if err := db.Raw().AutoMigrate(&user.User{}, &workspace.Workspace{}, &account.Account{}, &category.Category{}, &financialrecord.FinancialRecord{}); err != nil {
 		slog.Error("automigrate failed", "error", err)
 		os.Exit(1)
 	}
@@ -79,7 +89,11 @@ func main() {
 	categoryUsecase := category.NewCategoryUsecase(categoryRepo)
 	categoryHandler := category.NewCategoryHandler(categoryUsecase)
 
-	app := newAPIApp(cfg.App.Name, userHandler, workspaceHandler, accountHandler, categoryHandler, token)
+	financialRecordRepo := financialrecord.NewFinancialRecordRepository(db)
+	financialRecordUsecase := financialrecord.NewFinancialRecordUsecase(financialRecordRepo, accountRepo, categoryRepo)
+	financialRecordHandler := financialrecord.NewFinancialRecordHandler(financialRecordUsecase)
+
+	app := newAPIApp(cfg.App.Name, userHandler, workspaceHandler, accountHandler, categoryHandler, financialRecordHandler, token)
 
 	_ = cache
 
@@ -104,7 +118,7 @@ func newApp(appName string) *fiber.App {
 	return app
 }
 
-func newAPIApp(appName string, userHandler *user.UserHandler, workspaceHandler *workspace.WorkspaceHandler, accountHandler *account.AccountHandler, categoryHandler *category.CategoryHandler, token contract.Token) *fiber.App {
+func newAPIApp(appName string, userHandler *user.UserHandler, workspaceHandler *workspace.WorkspaceHandler, accountHandler *account.AccountHandler, categoryHandler *category.CategoryHandler, financialRecordHandler *financialrecord.FinancialRecordHandler, token contract.Token) *fiber.App {
 	app := newApp(appName)
 
 	// Public routes
@@ -116,6 +130,7 @@ func newAPIApp(appName string, userHandler *user.UserHandler, workspaceHandler *
 	workspaceHandler.RegisterRoutes(api)
 	accountHandler.RegisterRoutes(api)
 	categoryHandler.RegisterRoutes(api)
+	financialRecordHandler.RegisterRoutes(api)
 
 	return app
 }
