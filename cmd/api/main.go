@@ -76,8 +76,9 @@ func main() {
 	categoryHandler := category.NewCategoryHandler(categoryUsecase)
 
 	financialRecordRepo := financialrecord.NewFinancialRecordRepository(db)
-	financialRecordUsecase := financialrecord.NewFinancialRecordUsecase(financialRecordRepo, accountRepo, categoryRepo)
+	financialRecordUsecase := financialrecord.NewFinancialRecordUsecase(financialRecordRepo, accountUsecase, categoryUsecase)
 	financialRecordHandler := financialrecord.NewFinancialRecordHandler(financialRecordUsecase)
+
 
 	app := newAPIApp(cfg.App.Name, userHandler, workspaceHandler, accountHandler, categoryHandler, financialRecordHandler, token)
 

@@ -10,6 +10,7 @@ import (
 	"github.com/Got17/personal-finance-api/internal/account"
 	"github.com/Got17/personal-finance-api/internal/category"
 	"github.com/Got17/personal-finance-api/internal/financialrecord"
+	"github.com/Got17/personal-finance-api/internal/messages"
 )
 
 type records struct {
@@ -44,31 +45,35 @@ func (r *records) FindByUserID(_ context.Context, userID string, filter financia
 
 type accounts map[string]*account.Account
 
-func (a accounts) Create(context.Context, *account.Account) error                   { return nil }
-func (a accounts) FindByUserID(context.Context, string) ([]*account.Account, error) { return nil, nil }
-func (a accounts) Update(context.Context, *account.Account) error                   { return nil }
-func (a accounts) FindByID(_ context.Context, id string) (*account.Account, error) {
+func (a accounts) GetAccount(_ context.Context, userID string, id string) (*account.Account, error) {
 	entity, found := a[id]
 	if !found {
-		return nil, account.ErrAccountNotFound
+		return nil, errs.NotFound(messages.MsgAccountNotFound)
+	}
+	if entity.UserID != userID {
+		return nil, errs.Forbidden(messages.MsgAccountAccessDenied)
 	}
 	return entity, nil
 }
 
 type categories map[string]*category.Category
 
-func (c categories) Create(context.Context, *category.Category) error { return nil }
-func (c categories) FindByUserID(context.Context, string) ([]*category.Category, error) {
-	return nil, nil
-}
-func (c categories) Update(context.Context, *category.Category) error { return nil }
-func (c categories) FindByID(_ context.Context, id string) (*category.Category, error) {
+func (c categories) GetCategory(_ context.Context, userID string, id string) (*category.Category, error) {
 	entity, found := c[id]
 	if !found {
-		return nil, category.ErrCategoryNotFound
+		return nil, errs.NotFound(messages.MsgCategoryNotFound)
+	}
+	if entity.UserID != userID {
+		return nil, errs.Forbidden(messages.MsgCategoryAccessDenied)
 	}
 	return entity, nil
 }
+
+var (
+	_ financialrecord.AccountReader  = accounts{}
+	_ financialrecord.CategoryReader = categories{}
+)
+
 
 func TestCreateFinancialRecord_StoresValidIncomeInAccountCurrency(t *testing.T) {
 	repo := &records{}

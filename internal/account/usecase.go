@@ -112,7 +112,7 @@ func (u *accountUsecase) ListAccounts(ctx context.Context, userID string) ([]*Ac
 	return accounts, nil
 }
 
-func (u *accountUsecase) UpdateAccount(ctx context.Context, userID string, accountID string, input *UpdateAccountInput) (*Account, error) {
+func (u *accountUsecase) GetAccount(ctx context.Context, userID string, accountID string) (*Account, error) {
 	if strings.TrimSpace(userID) == "" {
 		return nil, errs.Unauthorized(messages.MsgUserNotFound)
 	}
@@ -121,7 +121,7 @@ func (u *accountUsecase) UpdateAccount(ctx context.Context, userID string, accou
 		return nil, errs.NotFound(messages.MsgAccountNotFound)
 	}
 
-	acct, err := u.repo.FindByID(ctx, accountID)
+	acct, err := u.repo.FindByID(ctx, strings.TrimSpace(accountID))
 	if err != nil {
 		if errors.Is(err, ErrAccountNotFound) {
 			return nil, errs.NotFound(messages.MsgAccountNotFound)
@@ -131,6 +131,15 @@ func (u *accountUsecase) UpdateAccount(ctx context.Context, userID string, accou
 
 	if acct.UserID != userID {
 		return nil, errs.Forbidden(messages.MsgAccountAccessDenied)
+	}
+
+	return acct, nil
+}
+
+func (u *accountUsecase) UpdateAccount(ctx context.Context, userID string, accountID string, input *UpdateAccountInput) (*Account, error) {
+	acct, err := u.GetAccount(ctx, userID, accountID)
+	if err != nil {
+		return nil, err
 	}
 
 	if fieldErrs := validator.Validate(input); len(fieldErrs) > 0 {
@@ -183,24 +192,9 @@ func (u *accountUsecase) UpdateAccount(ctx context.Context, userID string, accou
 }
 
 func (u *accountUsecase) DeactivateAccount(ctx context.Context, userID string, accountID string) (*Account, error) {
-	if strings.TrimSpace(userID) == "" {
-		return nil, errs.Unauthorized(messages.MsgUserNotFound)
-	}
-
-	if strings.TrimSpace(accountID) == "" {
-		return nil, errs.NotFound(messages.MsgAccountNotFound)
-	}
-
-	acct, err := u.repo.FindByID(ctx, accountID)
+	acct, err := u.GetAccount(ctx, userID, accountID)
 	if err != nil {
-		if errors.Is(err, ErrAccountNotFound) {
-			return nil, errs.NotFound(messages.MsgAccountNotFound)
-		}
 		return nil, err
-	}
-
-	if acct.UserID != userID {
-		return nil, errs.Forbidden(messages.MsgAccountAccessDenied)
 	}
 
 	acct.IsActive = false
@@ -211,3 +205,4 @@ func (u *accountUsecase) DeactivateAccount(ctx context.Context, userID string, a
 
 	return acct, nil
 }
+

@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"time"
+
+	"github.com/Got17/personal-finance-api/internal/account"
+	"github.com/Got17/personal-finance-api/internal/category"
 )
 
 var ErrFinancialRecordNotFound = errors.New("financial record not found")
@@ -43,6 +46,16 @@ type ListFilter struct {
 	IncludeArchived bool
 }
 
+// AccountReader is the consumer seam required by financial record for account verification.
+type AccountReader interface {
+	GetAccount(ctx context.Context, userID string, accountID string) (*account.Account, error)
+}
+
+// CategoryReader is the consumer seam required by financial record for category verification.
+type CategoryReader interface {
+	GetCategory(ctx context.Context, userID string, categoryID string) (*category.Category, error)
+}
+
 type FinancialRecordRepository interface {
 	Create(ctx context.Context, record *FinancialRecord) error
 	FindByID(ctx context.Context, id string) (*FinancialRecord, error)
@@ -59,3 +72,4 @@ type FinancialRecordUsecase interface {
 }
 
 func IsValidKind(value string) bool { return supportedKinds[Kind(value)] }
+

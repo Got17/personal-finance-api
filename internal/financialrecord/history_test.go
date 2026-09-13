@@ -8,9 +8,9 @@ import (
 
 	"github.com/BounkhongDev/bkgo/errs"
 
-	"github.com/Got17/personal-finance-api/internal/account"
 	"github.com/Got17/personal-finance-api/internal/category"
 	"github.com/Got17/personal-finance-api/internal/financialrecord"
+
 )
 
 type filteredRecords struct {
@@ -106,4 +106,4 @@ func TestCreateFinancialRecord_RejectsForeignAndInvalidReferences(t *testing.T) 
 	}
 }
 
-var _ account.AccountRepository = accounts{}
+

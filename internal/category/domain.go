@@ -45,6 +45,8 @@ type CategoryRepository interface {
 type CategoryUsecase interface {
 	CreateCategory(ctx context.Context, userID string, input *CreateCategoryInput) (*Category, error)
 	ListCategories(ctx context.Context, userID string) ([]*Category, error)
+	GetCategory(ctx context.Context, userID string, categoryID string) (*Category, error)
 	UpdateCategory(ctx context.Context, userID string, categoryID string, input *UpdateCategoryInput) (*Category, error)
 	DeactivateCategory(ctx context.Context, userID string, categoryID string) (*Category, error)
 }
+

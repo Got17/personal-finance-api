@@ -12,9 +12,9 @@ import (
 	"github.com/BounkhongDev/bkgo/middleware"
 	"github.com/gofiber/fiber/v2"
 
-	"github.com/Got17/personal-finance-api/internal/account"
 	"github.com/Got17/personal-finance-api/internal/category"
 	"github.com/Got17/personal-finance-api/internal/financialrecord"
+
 )
 
 func TestFinancialRecordHTTP_UpdatesAndArchivesOwnedRecord(t *testing.T) {
@@ -78,4 +78,4 @@ func TestFinancialRecordHTTP_UpdatesAndArchivesOwnedRecord(t *testing.T) {
 	}
 }
 
-var _ account.AccountRepository = accounts{}
+

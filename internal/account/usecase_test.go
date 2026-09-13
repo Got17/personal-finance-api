@@ -408,3 +408,69 @@ func TestDeactivateAccount_NotFound(t *testing.T) {
 		t.Fatalf("expected 404 AppError, got %#v", err)
 	}
 }
+
+func TestGetAccount_Success(t *testing.T) {
+	repo := newMockAccountRepo()
+	uc := account.NewAccountUsecase(repo)
+
+	created, err := uc.CreateAccount(context.Background(), "user-1", &account.CreateAccountInput{
+		Name: "Savings", Type: "savings", Currency: "USD",
+	})
+	if err != nil {
+		t.Fatalf("create failed: %v", err)
+	}
+
+	acct, err := uc.GetAccount(context.Background(), "user-1", created.ID)
+	if err != nil {
+		t.Fatalf("GetAccount() unexpected error: %v", err)
+	}
+	if acct.ID != created.ID || acct.UserID != "user-1" {
+		t.Fatalf("got acct = %#v, want ID %s", acct, created.ID)
+	}
+}
+
+func TestGetAccount_Unauthorized(t *testing.T) {
+	uc := account.NewAccountUsecase(newMockAccountRepo())
+	_, err := uc.GetAccount(context.Background(), "", "acct-1")
+	if err == nil {
+		t.Fatal("expected unauthorized error")
+	}
+	ae, ok := errs.IsAppError(err)
+	if !ok || ae.Status != 401 {
+		t.Fatalf("expected 401 AppError, got %#v", err)
+	}
+}
+
+func TestGetAccount_NotFound(t *testing.T) {
+	uc := account.NewAccountUsecase(newMockAccountRepo())
+	_, err := uc.GetAccount(context.Background(), "user-1", "non-existent")
+	if err == nil {
+		t.Fatal("expected not found error")
+	}
+	ae, ok := errs.IsAppError(err)
+	if !ok || ae.Status != 404 {
+		t.Fatalf("expected 404 AppError, got %#v", err)
+	}
+}
+
+func TestGetAccount_AccessDenied(t *testing.T) {
+	repo := newMockAccountRepo()
+	uc := account.NewAccountUsecase(repo)
+
+	created, err := uc.CreateAccount(context.Background(), "user-1", &account.CreateAccountInput{
+		Name: "Private", Type: "checking", Currency: "USD",
+	})
+	if err != nil {
+		t.Fatalf("create failed: %v", err)
+	}
+
+	_, err = uc.GetAccount(context.Background(), "user-2", created.ID)
+	if err == nil {
+		t.Fatal("expected access denied error")
+	}
+	ae, ok := errs.IsAppError(err)
+	if !ok || ae.Status != 403 {
+		t.Fatalf("expected 403 AppError, got %#v", err)
+	}
+}
+

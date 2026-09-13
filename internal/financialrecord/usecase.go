@@ -37,13 +37,14 @@ type UpdateFinancialRecordInput struct {
 }
 type financialRecordUsecase struct {
 	records    FinancialRecordRepository
-	accounts   account.AccountRepository
-	categories category.CategoryRepository
+	accounts   AccountReader
+	categories CategoryReader
 }
 
-func NewFinancialRecordUsecase(records FinancialRecordRepository, accounts account.AccountRepository, categories category.CategoryRepository) FinancialRecordUsecase {
+func NewFinancialRecordUsecase(records FinancialRecordRepository, accounts AccountReader, categories CategoryReader) FinancialRecordUsecase {
 	return &financialRecordUsecase{records: records, accounts: accounts, categories: categories}
 }
+
 
 func (u *financialRecordUsecase) CreateFinancialRecord(ctx context.Context, userID string, input *CreateFinancialRecordInput) (*FinancialRecord, error) {
 	if strings.TrimSpace(userID) == "" {
@@ -126,15 +127,9 @@ func (u *financialRecordUsecase) ListFinancialRecords(ctx context.Context, userI
 }
 
 func (u *financialRecordUsecase) findOwnedActiveAccount(ctx context.Context, userID string, accountID string) (*account.Account, error) {
-	acct, err := u.accounts.FindByID(ctx, strings.TrimSpace(accountID))
+	acct, err := u.accounts.GetAccount(ctx, userID, strings.TrimSpace(accountID))
 	if err != nil {
-		if errors.Is(err, account.ErrAccountNotFound) {
-			return nil, errs.NotFound(messages.MsgAccountNotFound)
-		}
 		return nil, err
-	}
-	if acct.UserID != userID {
-		return nil, errs.Forbidden(messages.MsgAccountAccessDenied)
 	}
 	if !acct.IsActive {
 		return nil, validationError("account_id", messages.MsgAccountMustBeActive)
@@ -143,15 +138,9 @@ func (u *financialRecordUsecase) findOwnedActiveAccount(ctx context.Context, use
 }
 
 func (u *financialRecordUsecase) validateCategory(ctx context.Context, userID string, categoryID string, kind Kind) error {
-	cat, err := u.categories.FindByID(ctx, strings.TrimSpace(categoryID))
+	cat, err := u.categories.GetCategory(ctx, userID, strings.TrimSpace(categoryID))
 	if err != nil {
-		if errors.Is(err, category.ErrCategoryNotFound) {
-			return errs.NotFound(messages.MsgCategoryNotFound)
-		}
 		return err
-	}
-	if cat.UserID != userID {
-		return errs.Forbidden(messages.MsgCategoryAccessDenied)
 	}
 	if !cat.IsActive {
 		return validationError("category_id", messages.MsgCategoryMustBeActive)
@@ -161,6 +150,7 @@ func (u *financialRecordUsecase) validateCategory(ctx context.Context, userID st
 	}
 	return nil
 }
+
 
 func validationError(field string, message string) error {
 	return errs.UnprocessableFields(messages.MsgValidationFailed, map[string]string{field: message})
