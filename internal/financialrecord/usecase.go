@@ -12,8 +12,8 @@ import (
 
 	"github.com/Got17/personal-finance-api/internal/account"
 	"github.com/Got17/personal-finance-api/internal/category"
+	"github.com/Got17/personal-finance-api/internal/currency"
 	"github.com/Got17/personal-finance-api/internal/messages"
-	"github.com/Got17/personal-finance-api/internal/user"
 )
 
 type CreateFinancialRecordInput struct {
@@ -64,22 +64,22 @@ func (u *financialRecordUsecase) CreateFinancialRecord(ctx context.Context, user
 	if !IsValidKind(string(kind)) {
 		return nil, validationError("kind", messages.MsgUnsupportedFinancialRecordKind)
 	}
-	currency := strings.ToUpper(strings.TrimSpace(input.Currency))
-	if !user.IsValidISO4217(currency) {
+	currCode := strings.ToUpper(strings.TrimSpace(input.Currency))
+	if !currency.IsValid(currCode) {
 		return nil, validationError("currency", messages.MsgInvalidCurrencyCode)
 	}
 	acct, err := u.findOwnedActiveAccount(ctx, userID, input.AccountID)
 	if err != nil {
 		return nil, err
 	}
-	if acct.Currency != currency {
+	if acct.Currency != currCode {
 		return nil, validationError("currency", messages.MsgAccountCurrencyMismatch)
 	}
 	if err := u.validateCategory(ctx, userID, input.CategoryID, kind); err != nil {
 		return nil, err
 	}
 
-	record := &FinancialRecord{ID: uuid.NewString(), UserID: userID, Kind: kind, AccountID: strings.TrimSpace(input.AccountID), CategoryID: strings.TrimSpace(input.CategoryID), AmountMinor: input.AmountMinor, Currency: currency, Date: input.Date.UTC(), Note: strings.TrimSpace(input.Note), IsActive: true}
+	record := &FinancialRecord{ID: uuid.NewString(), UserID: userID, Kind: kind, AccountID: strings.TrimSpace(input.AccountID), CategoryID: strings.TrimSpace(input.CategoryID), AmountMinor: input.AmountMinor, Currency: currCode, Date: input.Date.UTC(), Note: strings.TrimSpace(input.Note), IsActive: true}
 	if err := u.records.Create(ctx, record); err != nil {
 		return nil, err
 	}
@@ -176,7 +176,7 @@ func (u *financialRecordUsecase) UpdateFinancialRecord(ctx context.Context, user
 		return nil, validationError("record", messages.MsgFinancialRecordArchived)
 	}
 
-	kind, accountID, categoryID, amountMinor, currency, date, note := updateValues(record, input)
+	kind, accountID, categoryID, amountMinor, currCode, date, note := updateValues(record, input)
 	if !IsValidKind(string(kind)) {
 		return nil, validationError("kind", messages.MsgUnsupportedFinancialRecordKind)
 	}
@@ -186,14 +186,14 @@ func (u *financialRecordUsecase) UpdateFinancialRecord(ctx context.Context, user
 	if date.IsZero() {
 		return nil, validationError("date", messages.MsgDateIsRequired)
 	}
-	if !user.IsValidISO4217(currency) {
+	if !currency.IsValid(currCode) {
 		return nil, validationError("currency", messages.MsgInvalidCurrencyCode)
 	}
 	account, err := u.findOwnedActiveAccount(ctx, userID, accountID)
 	if err != nil {
 		return nil, err
 	}
-	if account.Currency != currency {
+	if account.Currency != currCode {
 		return nil, validationError("currency", messages.MsgAccountCurrencyMismatch)
 	}
 	if err := u.validateCategory(ctx, userID, categoryID, kind); err != nil {
@@ -201,7 +201,7 @@ func (u *financialRecordUsecase) UpdateFinancialRecord(ctx context.Context, user
 	}
 
 	record.Kind, record.AccountID, record.CategoryID = kind, accountID, categoryID
-	record.AmountMinor, record.Currency, record.Date, record.Note = amountMinor, currency, date.UTC(), note
+	record.AmountMinor, record.Currency, record.Date, record.Note = amountMinor, currCode, date.UTC(), note
 	if err := u.records.Update(ctx, record); err != nil {
 		return nil, err
 	}

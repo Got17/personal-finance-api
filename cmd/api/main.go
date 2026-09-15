@@ -18,6 +18,7 @@ import (
 
 	"github.com/Got17/personal-finance-api/internal/account"
 	"github.com/Got17/personal-finance-api/internal/category"
+	"github.com/Got17/personal-finance-api/internal/currency"
 	"github.com/Got17/personal-finance-api/internal/financialrecord"
 	"github.com/Got17/personal-finance-api/internal/user"
 	"github.com/Got17/personal-finance-api/internal/workspace"
@@ -79,8 +80,9 @@ func main() {
 	financialRecordUsecase := financialrecord.NewFinancialRecordUsecase(financialRecordRepo, accountUsecase, categoryUsecase)
 	financialRecordHandler := financialrecord.NewFinancialRecordHandler(financialRecordUsecase)
 
+	currencyHandler := currency.NewCurrencyHandler()
 
-	app := newAPIApp(cfg.App.Name, userHandler, workspaceHandler, accountHandler, categoryHandler, financialRecordHandler, token)
+	app := newAPIApp(cfg.App.Name, userHandler, workspaceHandler, accountHandler, categoryHandler, financialRecordHandler, currencyHandler, token)
 
 	_ = cache
 
@@ -105,11 +107,12 @@ func newApp(appName string) *fiber.App {
 	return app
 }
 
-func newAPIApp(appName string, userHandler *user.UserHandler, workspaceHandler *workspace.WorkspaceHandler, accountHandler *account.AccountHandler, categoryHandler *category.CategoryHandler, financialRecordHandler *financialrecord.FinancialRecordHandler, token contract.Token) *fiber.App {
+func newAPIApp(appName string, userHandler *user.UserHandler, workspaceHandler *workspace.WorkspaceHandler, accountHandler *account.AccountHandler, categoryHandler *category.CategoryHandler, financialRecordHandler *financialrecord.FinancialRecordHandler, currencyHandler *currency.CurrencyHandler, token contract.Token) *fiber.App {
 	app := newApp(appName)
 
 	// Public routes
 	userHandler.RegisterAuthRoutes(app.Group("/v1"))
+	currencyHandler.RegisterRoutes(app.Group("/v1"))
 
 	// Protected routes
 	api := app.Group("/v1", middleware.JWT(token))

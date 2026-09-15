@@ -10,8 +10,8 @@ import (
 	"github.com/BounkhongDev/bkgo/errs"
 	"github.com/BounkhongDev/bkgo/validator"
 
+	"github.com/Got17/personal-finance-api/internal/currency"
 	"github.com/Got17/personal-finance-api/internal/messages"
-	"github.com/Got17/personal-finance-api/internal/user"
 )
 
 type CreateAccountInput struct {
@@ -59,8 +59,8 @@ func (u *accountUsecase) CreateAccount(ctx context.Context, userID string, input
 		})
 	}
 
-	currency := strings.ToUpper(strings.TrimSpace(input.Currency))
-	if !user.IsValidISO4217(currency) {
+	currCode := strings.ToUpper(strings.TrimSpace(input.Currency))
+	if !currency.IsValid(currCode) {
 		return nil, errs.UnprocessableFields(messages.MsgValidationFailed, map[string]string{
 			"currency": messages.MsgInvalidCurrencyCode,
 		})
@@ -83,7 +83,7 @@ func (u *accountUsecase) CreateAccount(ctx context.Context, userID string, input
 		UserID:      userID,
 		Name:        name,
 		Type:        AccountType(acctType),
-		Currency:    currency,
+		Currency:    currCode,
 		Description: strings.TrimSpace(input.Description),
 		IsActive:    isActive,
 	}
@@ -167,13 +167,13 @@ func (u *accountUsecase) UpdateAccount(ctx context.Context, userID string, accou
 	}
 
 	if input.Currency != nil {
-		currency := strings.ToUpper(strings.TrimSpace(*input.Currency))
-		if !user.IsValidISO4217(currency) {
+		currCode := strings.ToUpper(strings.TrimSpace(*input.Currency))
+		if !currency.IsValid(currCode) {
 			return nil, errs.UnprocessableFields(messages.MsgValidationFailed, map[string]string{
 				"currency": messages.MsgInvalidCurrencyCode,
 			})
 		}
-		acct.Currency = currency
+		acct.Currency = currCode
 	}
 
 	if input.Description != nil {

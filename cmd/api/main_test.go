@@ -14,6 +14,7 @@ import (
 
 	"github.com/Got17/personal-finance-api/internal/account"
 	"github.com/Got17/personal-finance-api/internal/category"
+	"github.com/Got17/personal-finance-api/internal/currency"
 	"github.com/Got17/personal-finance-api/internal/financialrecord"
 	"github.com/Got17/personal-finance-api/internal/user"
 	"github.com/Got17/personal-finance-api/internal/workspace"
@@ -63,7 +64,7 @@ func TestConfiguredApp_SignInRouteIssuesSession(t *testing.T) {
 	wHandler := workspace.NewWorkspaceHandler(workspace.NewWorkspaceUsecase(&mainTestWorkspaceRepo{}))
 	acctHandler := account.NewAccountHandler(account.NewAccountUsecase(&mainTestAccountRepo{}))
 	catHandler := category.NewCategoryHandler(category.NewCategoryUsecase(&mainTestCategoryRepo{}))
-	app := newAPIApp("personal-finance-api", uHandler, wHandler, acctHandler, catHandler, testFinancialRecordHandler(), token)
+	app := newAPIApp("personal-finance-api", uHandler, wHandler, acctHandler, catHandler, testFinancialRecordHandler(), currency.NewCurrencyHandler(), token)
 
 	request := httptest.NewRequest("POST", "/v1/auth/login", bytes.NewBufferString(`{"email":"owner@example.com","password":"correct horse battery staple"}`))
 	request.Header.Set("Content-Type", "application/json")
@@ -91,7 +92,7 @@ func TestConfiguredApp_SignUpAndWorkspaceAccess(t *testing.T) {
 	wHandler := workspace.NewWorkspaceHandler(workspace.NewWorkspaceUsecase(wsRepo))
 	acctHandler := account.NewAccountHandler(account.NewAccountUsecase(&mainTestAccountRepo{}))
 	catHandler := category.NewCategoryHandler(category.NewCategoryUsecase(&mainTestCategoryRepo{}))
-	app := newAPIApp("personal-finance-api", uHandler, wHandler, acctHandler, catHandler, testFinancialRecordHandler(), token)
+	app := newAPIApp("personal-finance-api", uHandler, wHandler, acctHandler, catHandler, testFinancialRecordHandler(), currency.NewCurrencyHandler(), token)
 
 	// 1. Signup
 	signUpReq := httptest.NewRequest("POST", "/v1/auth/signup", bytes.NewBufferString(`{"email":"newowner@example.com","password":"securepassword123","workspace_name":"Private Vault"}`))
@@ -162,7 +163,7 @@ func TestConfiguredApp_CurrentUserAndWorkspaceIsolation(t *testing.T) {
 	wHandler := workspace.NewWorkspaceHandler(workspace.NewWorkspaceUsecase(wsRepo))
 	acctHandler := account.NewAccountHandler(account.NewAccountUsecase(&mainTestAccountRepo{}))
 	catHandler := category.NewCategoryHandler(category.NewCategoryUsecase(&mainTestCategoryRepo{}))
-	app := newAPIApp("personal-finance-api", uHandler, wHandler, acctHandler, catHandler, testFinancialRecordHandler(), token)
+	app := newAPIApp("personal-finance-api", uHandler, wHandler, acctHandler, catHandler, testFinancialRecordHandler(), currency.NewCurrencyHandler(), token)
 
 	// User 1 Token
 	token1, _ := token.Sign(map[string]any{"sub": "user-1"}, time.Hour)
@@ -256,7 +257,7 @@ func TestConfiguredApp_CreateAndListAccounts(t *testing.T) {
 	wHandler := workspace.NewWorkspaceHandler(workspace.NewWorkspaceUsecase(wsRepo))
 	acctHandler := account.NewAccountHandler(account.NewAccountUsecase(acctRepo))
 	catHandler := category.NewCategoryHandler(category.NewCategoryUsecase(&mainTestCategoryRepo{}))
-	app := newAPIApp("personal-finance-api", uHandler, wHandler, acctHandler, catHandler, testFinancialRecordHandler(), token)
+	app := newAPIApp("personal-finance-api", uHandler, wHandler, acctHandler, catHandler, testFinancialRecordHandler(), currency.NewCurrencyHandler(), token)
 
 	token1, _ := token.Sign(map[string]any{"sub": "user-1"}, time.Hour)
 
@@ -315,7 +316,7 @@ func TestConfiguredApp_UpdateAndDeactivateAccount(t *testing.T) {
 	wHandler := workspace.NewWorkspaceHandler(workspace.NewWorkspaceUsecase(wsRepo))
 	acctHandler := account.NewAccountHandler(account.NewAccountUsecase(acctRepo))
 	catHandler := category.NewCategoryHandler(category.NewCategoryUsecase(&mainTestCategoryRepo{}))
-	app := newAPIApp("personal-finance-api", uHandler, wHandler, acctHandler, catHandler, testFinancialRecordHandler(), token)
+	app := newAPIApp("personal-finance-api", uHandler, wHandler, acctHandler, catHandler, testFinancialRecordHandler(), currency.NewCurrencyHandler(), token)
 
 	token1, _ := token.Sign(map[string]any{"sub": "user-1"}, time.Hour)
 	token2, _ := token.Sign(map[string]any{"sub": "user-2"}, time.Hour)
@@ -407,7 +408,7 @@ func TestConfiguredApp_CreateAndListCategories(t *testing.T) {
 	wHandler := workspace.NewWorkspaceHandler(workspace.NewWorkspaceUsecase(wsRepo))
 	acctHandler := account.NewAccountHandler(account.NewAccountUsecase(acctRepo))
 	catHandler := category.NewCategoryHandler(category.NewCategoryUsecase(catRepo))
-	app := newAPIApp("personal-finance-api", uHandler, wHandler, acctHandler, catHandler, testFinancialRecordHandler(), token)
+	app := newAPIApp("personal-finance-api", uHandler, wHandler, acctHandler, catHandler, testFinancialRecordHandler(), currency.NewCurrencyHandler(), token)
 
 	token1, _ := token.Sign(map[string]any{"sub": "user-1"}, time.Hour)
 	token2, _ := token.Sign(map[string]any{"sub": "user-2"}, time.Hour)
@@ -514,7 +515,7 @@ func TestConfiguredApp_UpdateAndDeactivateCategory(t *testing.T) {
 	wHandler := workspace.NewWorkspaceHandler(workspace.NewWorkspaceUsecase(wsRepo))
 	acctHandler := account.NewAccountHandler(account.NewAccountUsecase(acctRepo))
 	catHandler := category.NewCategoryHandler(category.NewCategoryUsecase(catRepo))
-	app := newAPIApp("personal-finance-api", uHandler, wHandler, acctHandler, catHandler, testFinancialRecordHandler(), token)
+	app := newAPIApp("personal-finance-api", uHandler, wHandler, acctHandler, catHandler, testFinancialRecordHandler(), currency.NewCurrencyHandler(), token)
 
 	token1, _ := token.Sign(map[string]any{"sub": "user-1"}, time.Hour)
 	token2, _ := token.Sign(map[string]any{"sub": "user-2"}, time.Hour)
