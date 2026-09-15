@@ -128,8 +128,8 @@ func TestUpdateBaseCurrency_AuthenticatedCallerUpdatesOwnBaseCurrency(t *testing
 		t.Fatalf("updated base_currency = %q, want EUR", bodyPut.Data.BaseCurrency)
 	}
 
-	// 2. PATCH /v1/users/me/preferences with lowercase currency {"base_currency": "gbp"}
-	reqPatch := httptest.NewRequest("PATCH", "/v1/users/me/preferences", bytes.NewBufferString(`{"base_currency":"gbp"}`))
+	// 2. PATCH /v1/users/me/preferences with lowercase currency {"base_currency": "thb"}
+	reqPatch := httptest.NewRequest("PATCH", "/v1/users/me/preferences", bytes.NewBufferString(`{"base_currency":"thb"}`))
 	reqPatch.Header.Set("Authorization", "Bearer "+authToken)
 	reqPatch.Header.Set("Content-Type", "application/json")
 	respPatch, err := app.Test(reqPatch, 5000)
@@ -151,11 +151,11 @@ func TestUpdateBaseCurrency_AuthenticatedCallerUpdatesOwnBaseCurrency(t *testing
 	if err := json.NewDecoder(respPatch.Body).Decode(&bodyPatch); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if bodyPatch.Data.BaseCurrency != "GBP" {
-		t.Fatalf("normalized base_currency = %q, want GBP", bodyPatch.Data.BaseCurrency)
+	if bodyPatch.Data.BaseCurrency != "THB" {
+		t.Fatalf("normalized base_currency = %q, want THB", bodyPatch.Data.BaseCurrency)
 	}
 
-	// 3. Verify GET /v1/users/me now reflects GBP
+	// 3. Verify GET /v1/users/me now reflects THB
 	reqMe := httptest.NewRequest("GET", "/v1/users/me", nil)
 	reqMe.Header.Set("Authorization", "Bearer "+authToken)
 	respMe, err := app.Test(reqMe, 5000)
@@ -173,8 +173,8 @@ func TestUpdateBaseCurrency_AuthenticatedCallerUpdatesOwnBaseCurrency(t *testing
 	if err := json.NewDecoder(respMe.Body).Decode(&bodyMe); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if bodyMe.Data.BaseCurrency != "GBP" {
-		t.Fatalf("GET /v1/users/me base_currency = %q, want GBP", bodyMe.Data.BaseCurrency)
+	if bodyMe.Data.BaseCurrency != "THB" {
+		t.Fatalf("GET /v1/users/me base_currency = %q, want THB", bodyMe.Data.BaseCurrency)
 	}
 }
 

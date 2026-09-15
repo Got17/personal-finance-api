@@ -75,7 +75,8 @@ Requires a valid Bearer token. Returns `200 OK`:
 ### `PUT /v1/users/me/preferences` & `PATCH /v1/users/me/preferences`
 
 Updates the base currency preference for the currently authenticated user.
-Requires a valid Bearer token. Accepts a JSON payload with a valid 3-letter ISO 4217 currency code (`base_currency`).
+Requires a valid Bearer token. Accepts a JSON payload with one of the supported
+currency codes (`base_currency`; see [`GET /v1/currencies`](#get-v1currencies)).
 Invalid or unsupported currency codes receive a `422 Unprocessable Entity` response.
 
 ```json
@@ -96,13 +97,39 @@ Successful responses return `200 OK`:
 }
 ```
 
+## Currencies
+
+### `GET /v1/currencies`
+
+Returns the fixed, ordered list of currencies accepted by this system. Public;
+does not require a Bearer token.
+
+Successful responses return `200 OK` with JSON matching this shape:
+
+```json
+{
+  "success": true,
+  "data": [
+    { "code": "LAK", "name": "Lao Kip", "symbol": "₭", "decimal_digits": 0 },
+    { "code": "THB", "name": "Thai Baht", "symbol": "฿", "decimal_digits": 2 },
+    { "code": "USD", "name": "US Dollar", "symbol": "$", "decimal_digits": 2 },
+    { "code": "CNY", "name": "Chinese Yuan", "symbol": "¥", "decimal_digits": 2 },
+    { "code": "EUR", "name": "Euro", "symbol": "€", "decimal_digits": 2 }
+  ],
+  "message": ""
+}
+```
+
+Every `currency` and `base_currency` field elsewhere in this API (Accounts,
+Financial Records, user preferences) accepts only one of these five codes.
+
 ## Accounts
 
 ### `POST /v1/accounts`
 
 Creates a new financial account for the currently authenticated user.
 Requires a valid Bearer token in the `Authorization` header.
-Accepts `name`, `type` (`checking`, `savings`, `credit_card`, `investment`, `cash`, `loan`, `other`), `currency` (3-letter ISO 4217 code), optional `description`, and optional `is_active` (defaults to `true`).
+Accepts `name`, `type` (`checking`, `savings`, `credit_card`, `investment`, `cash`, `loan`, `other`), `currency` (one of the supported codes from [`GET /v1/currencies`](#get-v1currencies)), optional `description`, and optional `is_active` (defaults to `true`).
 Invalid input or unsupported account type/currency returns `422 Unprocessable Entity`.
 
 ```json
@@ -337,6 +364,71 @@ Successful responses return `200 OK` with the deactivated category:
   "message": ""
 }
 ```
+
+## Financial Records
+
+### `POST /v1/financial-records`
+
+Creates an active Income or Expense Financial Record for the authenticated user.
+The request requires `kind` (`income` or `expense`), `account_id`, `category_id`,
+positive integer `amount_minor`, `currency`, and an RFC 3339 `date`; `note` is
+optional. `amount_minor` is never a floating-point amount. The Account and
+Category must be active, owned by the caller, and their Category type must
+match `kind`. The request currency must equal the Account currency.
+
+```json
+{
+  "kind": "expense",
+  "account_id": "c7a8e999-4c0b-4ef8-bb6d-6bb9bd380a22",
+  "category_id": "e8b9f000-5d1c-4fe9-cc7e-7cc0ce491b33",
+  "amount_minor": 4250,
+  "currency": "USD",
+  "date": "2026-09-10T00:00:00Z",
+  "note": "Groceries"
+}
+```
+
+Returns `201 Created`. Malformed JSON returns `400`; unauthenticated calls
+return `401`; foreign references return `403`; missing references return `404`;
+and invalid amounts, currencies, dates, inactive references, or mismatched
+Category kinds return `422`.
+
+### `GET /v1/financial-records`
+
+Lists only the caller's records, newest first by record date. It defaults to
+active records. Optional query filters are `start_date`, `end_date` (both
+`YYYY-MM-DD`), `kind`, `account_id`, `category_id`, and
+`include_archived=true`. Invalid query values return `400`; an invalid kind or
+date range returns `422`.
+
+### `GET /v1/financial-records/:id`
+
+Retrieves one Financial Record owned by the authenticated user. Records owned
+by another user return `403`; absent records return `404`.
+
+### `PUT /v1/financial-records/:id` & `PATCH /v1/financial-records/:id`
+
+Corrects an active Financial Record owned by the authenticated user. Every field
+is optional, but the resulting record must still use active, owned Account and
+Category references whose Category type matches `kind`; its currency must match
+the Account currency, `amount_minor` must be positive, and `date` must be valid.
+Archived records are terminal and return `422 Unprocessable Entity` when edited.
+Cross-user requests return `403 Forbidden`.
+
+```json
+{
+  "amount_minor": 4250,
+  "note": "Corrected grocery total"
+}
+```
+
+### `DELETE /v1/financial-records/:id`
+
+Archives an owned Financial Record by setting `is_active` to `false`; it never
+hard-deletes financial history. Archived records remain individually retrievable
+and are returned by history only with `include_archived=true`. Cross-user archive
+requests return `403 Forbidden`; attempting to archive an already archived record
+returns `422 Unprocessable Entity`.
 
 ## Health
 

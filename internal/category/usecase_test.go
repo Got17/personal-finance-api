@@ -370,3 +370,81 @@ func TestDeactivateCategory_AccessDenied(t *testing.T) {
 		t.Fatalf("expected 403 AppError, got: %v", err)
 	}
 }
+
+func TestGetCategory_Success(t *testing.T) {
+	existing := &category.Category{
+		ID:       "cat-1",
+		UserID:   "user-1",
+		Name:     "Groceries",
+		Type:     category.CategoryTypeExpense,
+		IsActive: true,
+	}
+	repo := &mockCategoryRepo{
+		FindByIDFn: func(ctx context.Context, id string) (*category.Category, error) {
+			if id == "cat-1" {
+				return existing, nil
+			}
+			return nil, category.ErrCategoryNotFound
+		},
+	}
+	uc := category.NewCategoryUsecase(repo)
+	cat, err := uc.GetCategory(context.Background(), "user-1", "cat-1")
+	if err != nil {
+		t.Fatalf("GetCategory() unexpected error: %v", err)
+	}
+	if cat.ID != "cat-1" || cat.UserID != "user-1" {
+		t.Fatalf("got cat = %#v", cat)
+	}
+}
+
+func TestGetCategory_Unauthorized(t *testing.T) {
+	uc := category.NewCategoryUsecase(&mockCategoryRepo{})
+	_, err := uc.GetCategory(context.Background(), "", "cat-1")
+	if err == nil {
+		t.Fatal("expected unauthorized error")
+	}
+	ae, ok := errs.IsAppError(err)
+	if !ok || ae.Status != 401 {
+		t.Fatalf("expected 401 AppError, got: %v", err)
+	}
+}
+
+func TestGetCategory_NotFound(t *testing.T) {
+	repo := &mockCategoryRepo{
+		FindByIDFn: func(ctx context.Context, id string) (*category.Category, error) {
+			return nil, category.ErrCategoryNotFound
+		},
+	}
+	uc := category.NewCategoryUsecase(repo)
+	_, err := uc.GetCategory(context.Background(), "user-1", "missing-id")
+	if err == nil {
+		t.Fatal("expected not found error")
+	}
+	ae, ok := errs.IsAppError(err)
+	if !ok || ae.Status != 404 {
+		t.Fatalf("expected 404 AppError, got: %v", err)
+	}
+}
+
+func TestGetCategory_AccessDenied(t *testing.T) {
+	existing := &category.Category{
+		ID:       "cat-1",
+		UserID:   "owner-user",
+		IsActive: true,
+	}
+	repo := &mockCategoryRepo{
+		FindByIDFn: func(ctx context.Context, id string) (*category.Category, error) {
+			return existing, nil
+		},
+	}
+	uc := category.NewCategoryUsecase(repo)
+	_, err := uc.GetCategory(context.Background(), "foreign-user", "cat-1")
+	if err == nil {
+		t.Fatal("expected access denied error")
+	}
+	ae, ok := errs.IsAppError(err)
+	if !ok || ae.Status != 403 {
+		t.Fatalf("expected 403 AppError, got: %v", err)
+	}
+}
+
