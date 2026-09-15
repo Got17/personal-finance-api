@@ -78,6 +78,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /v1/currencies:
+    get:
+      operationId: listCurrencies
+      summary: List supported currencies
+      description: Returns the fixed, ordered list of currencies accepted by this system. Does not require authentication.
+      responses:
+        '200':
+          description: The supported currencies.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrencyListSuccessResponse'
   /v1/users/me:
     get:
       operationId: getCurrentUser
@@ -794,7 +806,7 @@ components:
         account_id: { type: string, format: uuid }
         category_id: { type: string, format: uuid }
         amount_minor: { type: integer, format: int64, minimum: 1, description: Positive amount in the Account currency's minor units. }
-        currency: { type: string, pattern: '^[A-Z]{3}$', description: Must equal the referenced Account currency. }
+        currency: { $ref: '#/components/schemas/CurrencyCode', description: Must equal the referenced Account currency. }
         date: { type: string, format: date-time }
         note: { type: string, maxLength: 1000 }
     UpdateFinancialRecordRequest:
@@ -805,7 +817,7 @@ components:
         account_id: { type: string, format: uuid }
         category_id: { type: string, format: uuid }
         amount_minor: { type: integer, format: int64, minimum: 1 }
-        currency: { type: string, pattern: '^[A-Z]{3}$' }
+        currency: { $ref: '#/components/schemas/CurrencyCode' }
         date: { type: string, format: date-time }
         note: { type: string, maxLength: 1000 }
     FinancialRecordResponse:
@@ -818,7 +830,7 @@ components:
         account_id: { type: string, format: uuid }
         category_id: { type: string, format: uuid }
         amount_minor: { type: integer, format: int64, minimum: 1 }
-        currency: { type: string, example: USD }
+        currency: { $ref: '#/components/schemas/CurrencyCode' }
         date: { type: string, format: date-time }
         note: { type: string }
         is_active: { type: boolean }
@@ -921,8 +933,7 @@ components:
           type: string
           format: email
         base_currency:
-          type: string
-          example: USD
+          $ref: '#/components/schemas/CurrencyCode'
         created_at:
           type: string
           format: date-time
@@ -935,9 +946,7 @@ components:
         - base_currency
       properties:
         base_currency:
-          type: string
-          example: EUR
-          description: Standard 3-letter ISO 4217 currency code.
+          $ref: '#/components/schemas/CurrencyCode'
     UserPreferencesSuccessResponse:
       type: object
       required:
@@ -954,8 +963,7 @@ components:
             - base_currency
           properties:
             base_currency:
-              type: string
-              example: USD
+              $ref: '#/components/schemas/CurrencyCode'
         message:
           type: string
     ErrorResponse:
@@ -1019,9 +1027,7 @@ components:
           example: checking
           enum: [checking, savings, credit_card, investment, cash, loan, other]
         currency:
-          type: string
-          example: USD
-          description: Standard 3-letter ISO 4217 currency code.
+          $ref: '#/components/schemas/CurrencyCode'
         description:
           type: string
           example: Primary daily checking account
@@ -1039,9 +1045,7 @@ components:
           example: savings
           enum: [checking, savings, credit_card, investment, cash, loan, other]
         currency:
-          type: string
-          example: USD
-          description: Standard 3-letter ISO 4217 currency code.
+          $ref: '#/components/schemas/CurrencyCode'
         description:
           type: string
           example: Updated account description
@@ -1074,8 +1078,7 @@ components:
           example: checking
           enum: [checking, savings, credit_card, investment, cash, loan, other]
         currency:
-          type: string
-          example: USD
+          $ref: '#/components/schemas/CurrencyCode'
         description:
           type: string
           example: Primary daily checking account
@@ -1207,6 +1210,47 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CategoryResponse'
+        message:
+          type: string
+    CurrencyCode:
+      type: string
+      enum: [LAK, THB, USD, CNY, EUR]
+      description: One of the currency codes supported by this system. See GET /v1/currencies for full display metadata.
+      example: USD
+    CurrencyResponse:
+      type: object
+      required:
+        - code
+        - name
+        - symbol
+        - decimal_digits
+      properties:
+        code:
+          $ref: '#/components/schemas/CurrencyCode'
+        name:
+          type: string
+          example: US Dollar
+        symbol:
+          type: string
+          example: $
+        decimal_digits:
+          type: integer
+          example: 2
+          description: Number of minor-unit decimal digits conventionally displayed for this currency (e.g. 0 for LAK).
+    CurrencyListSuccessResponse:
+      type: object
+      required:
+        - success
+        - data
+        - message
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/CurrencyResponse'
         message:
           type: string
 

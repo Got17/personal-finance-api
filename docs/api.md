@@ -75,7 +75,8 @@ Requires a valid Bearer token. Returns `200 OK`:
 ### `PUT /v1/users/me/preferences` & `PATCH /v1/users/me/preferences`
 
 Updates the base currency preference for the currently authenticated user.
-Requires a valid Bearer token. Accepts a JSON payload with a valid 3-letter ISO 4217 currency code (`base_currency`).
+Requires a valid Bearer token. Accepts a JSON payload with one of the supported
+currency codes (`base_currency`; see [`GET /v1/currencies`](#get-v1currencies)).
 Invalid or unsupported currency codes receive a `422 Unprocessable Entity` response.
 
 ```json
@@ -96,13 +97,39 @@ Successful responses return `200 OK`:
 }
 ```
 
+## Currencies
+
+### `GET /v1/currencies`
+
+Returns the fixed, ordered list of currencies accepted by this system. Public;
+does not require a Bearer token.
+
+Successful responses return `200 OK` with JSON matching this shape:
+
+```json
+{
+  "success": true,
+  "data": [
+    { "code": "LAK", "name": "Lao Kip", "symbol": "₭", "decimal_digits": 0 },
+    { "code": "THB", "name": "Thai Baht", "symbol": "฿", "decimal_digits": 2 },
+    { "code": "USD", "name": "US Dollar", "symbol": "$", "decimal_digits": 2 },
+    { "code": "CNY", "name": "Chinese Yuan", "symbol": "¥", "decimal_digits": 2 },
+    { "code": "EUR", "name": "Euro", "symbol": "€", "decimal_digits": 2 }
+  ],
+  "message": ""
+}
+```
+
+Every `currency` and `base_currency` field elsewhere in this API (Accounts,
+Financial Records, user preferences) accepts only one of these five codes.
+
 ## Accounts
 
 ### `POST /v1/accounts`
 
 Creates a new financial account for the currently authenticated user.
 Requires a valid Bearer token in the `Authorization` header.
-Accepts `name`, `type` (`checking`, `savings`, `credit_card`, `investment`, `cash`, `loan`, `other`), `currency` (3-letter ISO 4217 code), optional `description`, and optional `is_active` (defaults to `true`).
+Accepts `name`, `type` (`checking`, `savings`, `credit_card`, `investment`, `cash`, `loan`, `other`), `currency` (one of the supported codes from [`GET /v1/currencies`](#get-v1currencies)), optional `description`, and optional `is_active` (defaults to `true`).
 Invalid input or unsupported account type/currency returns `422 Unprocessable Entity`.
 
 ```json
