@@ -10,4 +10,5 @@ const (
 	MsgAccountCurrencyMismatch        = "currency must match account currency"
 	MsgDateIsRequired                 = "date is required"
 	MsgInvalidDateRange               = "start date must not be after end date"
+	MsgFinancialRecordArchived        = "archived financial record cannot be changed"
 )

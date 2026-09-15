@@ -35,6 +35,19 @@ type UpdateFinancialRecordInput struct {
 	Date        *time.Time `json:"date"         validate:"omitempty"`
 	Note        *string    `json:"note"         validate:"omitempty,max=1000"`
 }
+
+// recordFields is the normalized set of business fields shared by record
+// creation and replacement, so both paths validate the same values the same way.
+type recordFields struct {
+	Kind        Kind
+	AccountID   string
+	CategoryID  string
+	AmountMinor int64
+	Currency    string
+	Date        time.Time
+	Note        string
+}
+
 type financialRecordUsecase struct {
 	records    FinancialRecordRepository
 	accounts   AccountReader
@@ -44,7 +57,6 @@ type financialRecordUsecase struct {
 func NewFinancialRecordUsecase(records FinancialRecordRepository, accounts AccountReader, categories CategoryReader) FinancialRecordUsecase {
 	return &financialRecordUsecase{records: records, accounts: accounts, categories: categories}
 }
-
 
 func (u *financialRecordUsecase) CreateFinancialRecord(ctx context.Context, userID string, input *CreateFinancialRecordInput) (*FinancialRecord, error) {
 	if strings.TrimSpace(userID) == "" {
@@ -60,26 +72,31 @@ func (u *financialRecordUsecase) CreateFinancialRecord(ctx context.Context, user
 		return nil, validationError("date", messages.MsgDateIsRequired)
 	}
 
-	kind := Kind(strings.ToLower(strings.TrimSpace(input.Kind)))
-	if !IsValidKind(string(kind)) {
-		return nil, validationError("kind", messages.MsgUnsupportedFinancialRecordKind)
+	fields := recordFields{
+		Kind:        Kind(strings.ToLower(strings.TrimSpace(input.Kind))),
+		AccountID:   strings.TrimSpace(input.AccountID),
+		CategoryID:  strings.TrimSpace(input.CategoryID),
+		AmountMinor: input.AmountMinor,
+		Currency:    strings.ToUpper(strings.TrimSpace(input.Currency)),
+		Date:        input.Date.UTC(),
+		Note:        strings.TrimSpace(input.Note),
 	}
-	currCode := strings.ToUpper(strings.TrimSpace(input.Currency))
-	if !currency.IsValid(currCode) {
-		return nil, validationError("currency", messages.MsgInvalidCurrencyCode)
-	}
-	acct, err := u.findOwnedActiveAccount(ctx, userID, input.AccountID)
-	if err != nil {
-		return nil, err
-	}
-	if acct.Currency != currCode {
-		return nil, validationError("currency", messages.MsgAccountCurrencyMismatch)
-	}
-	if err := u.validateCategory(ctx, userID, input.CategoryID, kind); err != nil {
+	if err := u.validateRecordReferences(ctx, userID, fields); err != nil {
 		return nil, err
 	}
 
-	record := &FinancialRecord{ID: uuid.NewString(), UserID: userID, Kind: kind, AccountID: strings.TrimSpace(input.AccountID), CategoryID: strings.TrimSpace(input.CategoryID), AmountMinor: input.AmountMinor, Currency: currCode, Date: input.Date.UTC(), Note: strings.TrimSpace(input.Note), IsActive: true}
+	record := &FinancialRecord{
+		ID:          uuid.NewString(),
+		UserID:      userID,
+		Kind:        fields.Kind,
+		AccountID:   fields.AccountID,
+		CategoryID:  fields.CategoryID,
+		AmountMinor: fields.AmountMinor,
+		Currency:    fields.Currency,
+		Date:        fields.Date,
+		Note:        fields.Note,
+		IsActive:    true,
+	}
 	if err := u.records.Create(ctx, record); err != nil {
 		return nil, err
 	}
@@ -130,7 +147,6 @@ func (u *financialRecordUsecase) ListFinancialRecords(ctx context.Context, userI
 	return records, nil
 }
 
-
 func (u *financialRecordUsecase) findOwnedActiveAccount(ctx context.Context, userID string, accountID string) (*account.Account, error) {
 	acct, err := u.accounts.GetAccount(ctx, userID, strings.TrimSpace(accountID))
 	if err != nil {
@@ -156,6 +172,24 @@ func (u *financialRecordUsecase) validateCategory(ctx context.Context, userID st
 	return nil
 }
 
+// validateRecordReferences is the single source of truth for the kind,
+// currency, and owned/active Account+Category rules shared by create and update.
+func (u *financialRecordUsecase) validateRecordReferences(ctx context.Context, userID string, fields recordFields) error {
+	if !IsValidKind(string(fields.Kind)) {
+		return validationError("kind", messages.MsgUnsupportedFinancialRecordKind)
+	}
+	if !currency.IsValid(fields.Currency) {
+		return validationError("currency", messages.MsgInvalidCurrencyCode)
+	}
+	acct, err := u.findOwnedActiveAccount(ctx, userID, fields.AccountID)
+	if err != nil {
+		return err
+	}
+	if acct.Currency != fields.Currency {
+		return validationError("currency", messages.MsgAccountCurrencyMismatch)
+	}
+	return u.validateCategory(ctx, userID, fields.CategoryID, fields.Kind)
+}
 
 func validationError(field string, message string) error {
 	return errs.UnprocessableFields(messages.MsgValidationFailed, map[string]string{field: message})
@@ -176,32 +210,21 @@ func (u *financialRecordUsecase) UpdateFinancialRecord(ctx context.Context, user
 		return nil, validationError("record", messages.MsgFinancialRecordArchived)
 	}
 
-	kind, accountID, categoryID, amountMinor, currCode, date, note := updateValues(record, input)
-	if !IsValidKind(string(kind)) {
-		return nil, validationError("kind", messages.MsgUnsupportedFinancialRecordKind)
-	}
-	if amountMinor <= 0 {
+	// Amount and date are checked locally, ahead of validateRecordReferences'
+	// account/category lookups, so a cheap shape error short-circuits before any DB call.
+	fields := updateValues(record, input)
+	if fields.AmountMinor <= 0 {
 		return nil, validationError("amount_minor", messages.MsgValidationFailed)
 	}
-	if date.IsZero() {
+	if fields.Date.IsZero() {
 		return nil, validationError("date", messages.MsgDateIsRequired)
 	}
-	if !currency.IsValid(currCode) {
-		return nil, validationError("currency", messages.MsgInvalidCurrencyCode)
-	}
-	account, err := u.findOwnedActiveAccount(ctx, userID, accountID)
-	if err != nil {
-		return nil, err
-	}
-	if account.Currency != currCode {
-		return nil, validationError("currency", messages.MsgAccountCurrencyMismatch)
-	}
-	if err := u.validateCategory(ctx, userID, categoryID, kind); err != nil {
+	if err := u.validateRecordReferences(ctx, userID, fields); err != nil {
 		return nil, err
 	}
 
-	record.Kind, record.AccountID, record.CategoryID = kind, accountID, categoryID
-	record.AmountMinor, record.Currency, record.Date, record.Note = amountMinor, currCode, date.UTC(), note
+	record.Kind, record.AccountID, record.CategoryID = fields.Kind, fields.AccountID, fields.CategoryID
+	record.AmountMinor, record.Currency, record.Date, record.Note = fields.AmountMinor, fields.Currency, fields.Date, fields.Note
 	if err := u.records.Update(ctx, record); err != nil {
 		return nil, err
 	}
@@ -223,31 +246,40 @@ func (u *financialRecordUsecase) ArchiveFinancialRecord(ctx context.Context, use
 	return record, nil
 }
 
-func updateValues(record *FinancialRecord, input *UpdateFinancialRecordInput) (Kind, string, string, int64, string, time.Time, string) {
-	kind, accountID, categoryID := record.Kind, record.AccountID, record.CategoryID
-	amountMinor, currency, date, note := record.AmountMinor, record.Currency, record.Date, record.Note
+// updateValues overlays the changed fields from input onto record's current
+// values, so validateRecordReferences always sees the full post-update state.
+func updateValues(record *FinancialRecord, input *UpdateFinancialRecordInput) recordFields {
+	fields := recordFields{
+		Kind:        record.Kind,
+		AccountID:   record.AccountID,
+		CategoryID:  record.CategoryID,
+		AmountMinor: record.AmountMinor,
+		Currency:    record.Currency,
+		Date:        record.Date,
+		Note:        record.Note,
+	}
 	if input.Kind != nil {
-		kind = Kind(strings.ToLower(strings.TrimSpace(*input.Kind)))
+		fields.Kind = Kind(strings.ToLower(strings.TrimSpace(*input.Kind)))
 	}
 	if input.AccountID != nil {
-		accountID = strings.TrimSpace(*input.AccountID)
+		fields.AccountID = strings.TrimSpace(*input.AccountID)
 	}
 	if input.CategoryID != nil {
-		categoryID = strings.TrimSpace(*input.CategoryID)
+		fields.CategoryID = strings.TrimSpace(*input.CategoryID)
 	}
 	if input.AmountMinor != nil {
-		amountMinor = *input.AmountMinor
+		fields.AmountMinor = *input.AmountMinor
 	}
 	if input.Currency != nil {
-		currency = strings.ToUpper(strings.TrimSpace(*input.Currency))
+		fields.Currency = strings.ToUpper(strings.TrimSpace(*input.Currency))
 	}
 	if input.Date != nil {
-		date = input.Date.UTC()
+		fields.Date = input.Date.UTC()
 	}
 	if input.Note != nil {
-		note = strings.TrimSpace(*input.Note)
+		fields.Note = strings.TrimSpace(*input.Note)
 	}
-	return kind, accountID, categoryID, amountMinor, currency, date, note
+	return fields
 }
 
 // inclusiveEndDate expands a date boundary to the final microsecond of that day
@@ -260,5 +292,3 @@ func inclusiveEndDate(value *time.Time) *time.Time {
 	inclusive := value.AddDate(0, 0, 1).Add(-time.Microsecond)
 	return &inclusive
 }
-
-
