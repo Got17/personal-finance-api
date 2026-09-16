@@ -97,7 +97,7 @@ func (u *categoryUsecase) ListCategories(ctx context.Context, userID string) ([]
 	return categories, nil
 }
 
-func (u *categoryUsecase) UpdateCategory(ctx context.Context, userID string, categoryID string, input *UpdateCategoryInput) (*Category, error) {
+func (u *categoryUsecase) GetCategory(ctx context.Context, userID string, categoryID string) (*Category, error) {
 	if strings.TrimSpace(userID) == "" {
 		return nil, errs.Unauthorized(messages.MsgUserNotFound)
 	}
@@ -106,7 +106,7 @@ func (u *categoryUsecase) UpdateCategory(ctx context.Context, userID string, cat
 		return nil, errs.NotFound(messages.MsgCategoryNotFound)
 	}
 
-	cat, err := u.repo.FindByID(ctx, categoryID)
+	cat, err := u.repo.FindByID(ctx, strings.TrimSpace(categoryID))
 	if err != nil {
 		if errors.Is(err, ErrCategoryNotFound) {
 			return nil, errs.NotFound(messages.MsgCategoryNotFound)
@@ -116,6 +116,15 @@ func (u *categoryUsecase) UpdateCategory(ctx context.Context, userID string, cat
 
 	if cat.UserID != userID {
 		return nil, errs.Forbidden(messages.MsgCategoryAccessDenied)
+	}
+
+	return cat, nil
+}
+
+func (u *categoryUsecase) UpdateCategory(ctx context.Context, userID string, categoryID string, input *UpdateCategoryInput) (*Category, error) {
+	cat, err := u.GetCategory(ctx, userID, categoryID)
+	if err != nil {
+		return nil, err
 	}
 
 	if fieldErrs := validator.Validate(input); len(fieldErrs) > 0 {
@@ -154,24 +163,9 @@ func (u *categoryUsecase) UpdateCategory(ctx context.Context, userID string, cat
 }
 
 func (u *categoryUsecase) DeactivateCategory(ctx context.Context, userID string, categoryID string) (*Category, error) {
-	if strings.TrimSpace(userID) == "" {
-		return nil, errs.Unauthorized(messages.MsgUserNotFound)
-	}
-
-	if strings.TrimSpace(categoryID) == "" {
-		return nil, errs.NotFound(messages.MsgCategoryNotFound)
-	}
-
-	cat, err := u.repo.FindByID(ctx, categoryID)
+	cat, err := u.GetCategory(ctx, userID, categoryID)
 	if err != nil {
-		if errors.Is(err, ErrCategoryNotFound) {
-			return nil, errs.NotFound(messages.MsgCategoryNotFound)
-		}
 		return nil, err
-	}
-
-	if cat.UserID != userID {
-		return nil, errs.Forbidden(messages.MsgCategoryAccessDenied)
 	}
 
 	cat.IsActive = false
@@ -182,3 +176,4 @@ func (u *categoryUsecase) DeactivateCategory(ctx context.Context, userID string,
 
 	return cat, nil
 }
+

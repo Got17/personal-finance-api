@@ -78,6 +78,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /v1/currencies:
+    get:
+      operationId: listCurrencies
+      summary: List supported currencies
+      description: Returns the fixed, ordered list of currencies accepted by this system. Does not require authentication.
+      responses:
+        '200':
+          description: The supported currencies.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrencyListSuccessResponse'
   /v1/users/me:
     get:
       operationId: getCurrentUser
@@ -592,6 +604,155 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /v1/financial-records:
+    post:
+      operationId: createFinancialRecord
+      summary: Create an income or expense financial record
+      description: Creates an active record for the authenticated user. The Account and Category must be active, owned by the caller, and match the record kind and currency.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateFinancialRecordRequest'
+      responses:
+        '201':
+          description: Financial record created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FinancialRecordSuccessResponse'
+        '400': { description: The request body is malformed. }
+        '401': { description: Unauthenticated or invalid token. }
+        '403': { description: A referenced account or category belongs to another user. }
+        '404': { description: A referenced account or category was not found. }
+        '422': { description: Validation failed, including inactive or kind-mismatched references and invalid amounts, dates, or currencies. }
+    get:
+      operationId: listFinancialRecords
+      summary: List the authenticated user's financial record history
+      description: Returns active records newest-first by default. Set include_archived to true to include archived records.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/FinancialRecordStartDate'
+        - $ref: '#/components/parameters/FinancialRecordEndDate'
+        - $ref: '#/components/parameters/FinancialRecordKind'
+        - $ref: '#/components/parameters/FinancialRecordAccountID'
+        - $ref: '#/components/parameters/FinancialRecordCategoryID'
+        - $ref: '#/components/parameters/FinancialRecordIncludeArchived'
+      responses:
+        '200':
+          description: Financial record history.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FinancialRecordListSuccessResponse'
+        '400': { description: A query parameter is malformed. }
+        '401': { description: Unauthenticated or invalid token. }
+        '422': { description: The filter combination is invalid. }
+  /v1/financial-records/{id}:
+    get:
+      operationId: getFinancialRecord
+      summary: Retrieve one financial record
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Financial record found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FinancialRecordSuccessResponse'
+        '401': { description: Unauthenticated or invalid token. }
+        '403': { description: The record belongs to another user. }
+        '404': { description: Financial record not found. }
+    put:
+      operationId: updateFinancialRecord
+      summary: Update an active financial record
+      description: Updates supplied business fields after validating the resulting Account, Category, kind, amount, currency, and date. Archived records cannot be updated.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateFinancialRecordRequest'
+      responses:
+        '200':
+          description: Financial record updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FinancialRecordSuccessResponse'
+        '400': { description: The request body is malformed. }
+        '401': { description: Unauthenticated or invalid token. }
+        '403': { description: The record or a referenced resource belongs to another user. }
+        '404': { description: The record or a referenced resource was not found. }
+        '422': { description: Validation failed or the record is archived. }
+    patch:
+      operationId: patchFinancialRecord
+      summary: Update an active financial record
+      description: Same partial-update behavior as PUT. Archived records cannot be updated.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateFinancialRecordRequest'
+      responses:
+        '200':
+          description: Financial record updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FinancialRecordSuccessResponse'
+        '400': { description: The request body is malformed. }
+        '401': { description: Unauthenticated or invalid token. }
+        '403': { description: The record or a referenced resource belongs to another user. }
+        '404': { description: The record or a referenced resource was not found. }
+        '422': { description: Validation failed or the record is archived. }
+    delete:
+      operationId: archiveFinancialRecord
+      summary: Archive a financial record
+      description: Sets is_active to false without hard-deleting the owned record. Archived records remain retrievable and are included in history only when include_archived is true.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Financial record archived successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FinancialRecordSuccessResponse'
+        '401': { description: Unauthenticated or invalid token. }
+        '403': { description: The record belongs to another user. }
+        '404': { description: Financial record not found. }
+        '422': { description: The record is already archived. }
   /v1/health:
 
     get:
@@ -611,7 +772,86 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
+  parameters:
+    FinancialRecordStartDate:
+      name: start_date
+      in: query
+      schema: { type: string, format: date }
+    FinancialRecordEndDate:
+      name: end_date
+      in: query
+      schema: { type: string, format: date }
+    FinancialRecordKind:
+      name: kind
+      in: query
+      schema: { type: string, enum: [income, expense] }
+    FinancialRecordAccountID:
+      name: account_id
+      in: query
+      schema: { type: string, format: uuid }
+    FinancialRecordCategoryID:
+      name: category_id
+      in: query
+      schema: { type: string, format: uuid }
+    FinancialRecordIncludeArchived:
+      name: include_archived
+      in: query
+      schema: { type: boolean, default: false }
   schemas:
+    CreateFinancialRecordRequest:
+      type: object
+      required: [kind, account_id, category_id, amount_minor, currency, date]
+      properties:
+        kind: { type: string, enum: [income, expense] }
+        account_id: { type: string, format: uuid }
+        category_id: { type: string, format: uuid }
+        amount_minor: { type: integer, format: int64, minimum: 1, description: Positive amount in the Account currency's minor units. }
+        currency: { $ref: '#/components/schemas/CurrencyCode', description: Must equal the referenced Account currency. }
+        date: { type: string, format: date-time }
+        note: { type: string, maxLength: 1000 }
+    UpdateFinancialRecordRequest:
+      type: object
+      description: Any supplied fields replace their current values; the resulting record must still have active, owned, kind-matched references and the Account currency.
+      properties:
+        kind: { type: string, enum: [income, expense] }
+        account_id: { type: string, format: uuid }
+        category_id: { type: string, format: uuid }
+        amount_minor: { type: integer, format: int64, minimum: 1 }
+        currency: { $ref: '#/components/schemas/CurrencyCode' }
+        date: { type: string, format: date-time }
+        note: { type: string, maxLength: 1000 }
+    FinancialRecordResponse:
+      type: object
+      required: [id, user_id, kind, account_id, category_id, amount_minor, currency, date, is_active, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        user_id: { type: string, format: uuid }
+        kind: { type: string, enum: [income, expense] }
+        account_id: { type: string, format: uuid }
+        category_id: { type: string, format: uuid }
+        amount_minor: { type: integer, format: int64, minimum: 1 }
+        currency: { $ref: '#/components/schemas/CurrencyCode' }
+        date: { type: string, format: date-time }
+        note: { type: string }
+        is_active: { type: boolean }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    FinancialRecordSuccessResponse:
+      type: object
+      required: [success, data, message]
+      properties:
+        success: { type: boolean, const: true }
+        data: { $ref: '#/components/schemas/FinancialRecordResponse' }
+        message: { type: string }
+    FinancialRecordListSuccessResponse:
+      type: object
+      required: [success, data, message]
+      properties:
+        success: { type: boolean, const: true }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/FinancialRecordResponse' }
+        message: { type: string }
     SignInRequest:
       type: object
       required:
@@ -693,8 +933,7 @@ components:
           type: string
           format: email
         base_currency:
-          type: string
-          example: USD
+          $ref: '#/components/schemas/CurrencyCode'
         created_at:
           type: string
           format: date-time
@@ -707,9 +946,7 @@ components:
         - base_currency
       properties:
         base_currency:
-          type: string
-          example: EUR
-          description: Standard 3-letter ISO 4217 currency code.
+          $ref: '#/components/schemas/CurrencyCode'
     UserPreferencesSuccessResponse:
       type: object
       required:
@@ -726,8 +963,7 @@ components:
             - base_currency
           properties:
             base_currency:
-              type: string
-              example: USD
+              $ref: '#/components/schemas/CurrencyCode'
         message:
           type: string
     ErrorResponse:
@@ -791,9 +1027,7 @@ components:
           example: checking
           enum: [checking, savings, credit_card, investment, cash, loan, other]
         currency:
-          type: string
-          example: USD
-          description: Standard 3-letter ISO 4217 currency code.
+          $ref: '#/components/schemas/CurrencyCode'
         description:
           type: string
           example: Primary daily checking account
@@ -811,9 +1045,7 @@ components:
           example: savings
           enum: [checking, savings, credit_card, investment, cash, loan, other]
         currency:
-          type: string
-          example: USD
-          description: Standard 3-letter ISO 4217 currency code.
+          $ref: '#/components/schemas/CurrencyCode'
         description:
           type: string
           example: Updated account description
@@ -846,8 +1078,7 @@ components:
           example: checking
           enum: [checking, savings, credit_card, investment, cash, loan, other]
         currency:
-          type: string
-          example: USD
+          $ref: '#/components/schemas/CurrencyCode'
         description:
           type: string
           example: Primary daily checking account
@@ -979,6 +1210,47 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CategoryResponse'
+        message:
+          type: string
+    CurrencyCode:
+      type: string
+      enum: [LAK, THB, USD, CNY, EUR]
+      description: One of the currency codes supported by this system. See GET /v1/currencies for full display metadata.
+      example: USD
+    CurrencyResponse:
+      type: object
+      required:
+        - code
+        - name
+        - symbol
+        - decimal_digits
+      properties:
+        code:
+          $ref: '#/components/schemas/CurrencyCode'
+        name:
+          type: string
+          example: US Dollar
+        symbol:
+          type: string
+          example: $
+        decimal_digits:
+          type: integer
+          example: 2
+          description: Number of minor-unit decimal digits conventionally displayed for this currency (e.g. 0 for LAK).
+    CurrencyListSuccessResponse:
+      type: object
+      required:
+        - success
+        - data
+        - message
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/CurrencyResponse'
         message:
           type: string
 

@@ -61,6 +61,8 @@ type AccountRepository interface {
 type AccountUsecase interface {
 	CreateAccount(ctx context.Context, userID string, input *CreateAccountInput) (*Account, error)
 	ListAccounts(ctx context.Context, userID string) ([]*Account, error)
+	GetAccount(ctx context.Context, userID string, accountID string) (*Account, error)
 	UpdateAccount(ctx context.Context, userID string, accountID string, input *UpdateAccountInput) (*Account, error)
 	DeactivateAccount(ctx context.Context, userID string, accountID string) (*Account, error)
 }
+
