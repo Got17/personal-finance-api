@@ -1,6 +1,5 @@
-﻿package currency
+package currency
 
-// Currency holds display metadata for a supported currency code.
 type Currency struct {
 	Code          string `json:"code"`
 	Name          string `json:"name"`
@@ -42,7 +41,6 @@ func SupportedCurrencies() []Currency {
 	return out
 }
 
-// normalize upper-cases and strips whitespace from a currency code.
 func normalize(code string) string {
 	out := make([]byte, 0, len(code))
 	for i := 0; i < len(code); i++ {

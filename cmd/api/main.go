@@ -82,7 +82,14 @@ func main() {
 
 	currencyHandler := currency.NewCurrencyHandler()
 
-	app := newAPIApp(cfg.App.Name, userHandler, workspaceHandler, accountHandler, categoryHandler, financialRecordHandler, currencyHandler, token)
+	app := newAPIApp(cfg.App.Name, apiHandlers{
+		user:            userHandler,
+		workspace:       workspaceHandler,
+		account:         accountHandler,
+		category:        categoryHandler,
+		financialRecord: financialRecordHandler,
+		currency:        currencyHandler,
+	}, token)
 
 	_ = cache
 
@@ -91,6 +98,15 @@ func main() {
 		slog.Error("server error", "error", err)
 		os.Exit(1)
 	}
+}
+
+type apiHandlers struct {
+	user            *user.UserHandler
+	workspace       *workspace.WorkspaceHandler
+	account         *account.AccountHandler
+	category        *category.CategoryHandler
+	financialRecord *financialrecord.FinancialRecordHandler
+	currency        *currency.CurrencyHandler
 }
 
 func newApp(appName string) *fiber.App {
@@ -107,20 +123,20 @@ func newApp(appName string) *fiber.App {
 	return app
 }
 
-func newAPIApp(appName string, userHandler *user.UserHandler, workspaceHandler *workspace.WorkspaceHandler, accountHandler *account.AccountHandler, categoryHandler *category.CategoryHandler, financialRecordHandler *financialrecord.FinancialRecordHandler, currencyHandler *currency.CurrencyHandler, token contract.Token) *fiber.App {
+func newAPIApp(appName string, handlers apiHandlers, token contract.Token) *fiber.App {
 	app := newApp(appName)
 
 	// Public routes
-	userHandler.RegisterAuthRoutes(app.Group("/v1"))
-	currencyHandler.RegisterRoutes(app.Group("/v1"))
+	handlers.user.RegisterAuthRoutes(app.Group("/v1"))
+	handlers.currency.RegisterRoutes(app.Group("/v1"))
 
 	// Protected routes
 	api := app.Group("/v1", middleware.JWT(token))
-	userHandler.RegisterProtectedRoutes(api)
-	workspaceHandler.RegisterRoutes(api)
-	accountHandler.RegisterRoutes(api)
-	categoryHandler.RegisterRoutes(api)
-	financialRecordHandler.RegisterRoutes(api)
+	handlers.user.RegisterProtectedRoutes(api)
+	handlers.workspace.RegisterRoutes(api)
+	handlers.account.RegisterRoutes(api)
+	handlers.category.RegisterRoutes(api)
+	handlers.financialRecord.RegisterRoutes(api)
 
 	return app
 }

@@ -50,11 +50,6 @@ type Session struct {
 	TokenType   string `json:"token_type"`
 }
 
-// IsValidISO4217 reports whether code is a supported currency code.
-// Delegates to the currency package which enforces the fixed allowed set.
-func IsValidISO4217(code string) bool {
-	return currency.IsValid(code)
-}
 
 type userUsecase struct {
 	repo  UserRepository
@@ -170,12 +165,12 @@ func (u *userUsecase) UpdatePreferences(ctx context.Context, userID string, inpu
 		return nil, errs.UnprocessableFields(messages.MsgValidationFailed, fieldErrs)
 	}
 
-	currency := strings.ToUpper(strings.TrimSpace(input.BaseCurrency))
-	if !IsValidISO4217(currency) {
+	curr := strings.ToUpper(strings.TrimSpace(input.BaseCurrency))
+	if !currency.IsValid(curr) {
 		return nil, errs.UnprocessableFields(messages.MsgValidationFailed, map[string]string{"base_currency": messages.MsgInvalidCurrencyCode})
 	}
 
-	updatedUser, err := u.repo.UpdateBaseCurrency(ctx, userID, currency)
+	updatedUser, err := u.repo.UpdateBaseCurrency(ctx, userID, curr)
 	if err != nil {
 		if errors.Is(err, ErrUserNotFound) {
 			return nil, errs.Unauthorized(messages.MsgUserNotFound)

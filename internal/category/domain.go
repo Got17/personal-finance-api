@@ -3,6 +3,7 @@ package category
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 )
 
@@ -34,6 +35,14 @@ type Category struct {
 }
 
 func (Category) TableName() string { return "categories" }
+
+// MatchesKind reports whether the category's type matches the given financial record kind.
+func (c *Category) MatchesKind(kind string) bool {
+	if c == nil {
+		return false
+	}
+	return strings.EqualFold(string(c.Type), strings.TrimSpace(kind))
+}
 
 type CategoryRepository interface {
 	Create(ctx context.Context, entity *Category) error
