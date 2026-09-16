@@ -67,10 +67,6 @@ func (u *financialRecordUsecase) CreateFinancialRecord(ctx context.Context, user
 	if fieldErrs := validator.Validate(input); len(fieldErrs) > 0 {
 		return nil, errs.UnprocessableFields(messages.MsgValidationFailed, fieldErrs)
 	}
-	if input.Date.IsZero() {
-		return nil, validationError("date", messages.MsgDateIsRequired)
-	}
-
 	fields := recordFields{
 		Kind:        Kind(strings.ToLower(strings.TrimSpace(input.Kind))),
 		AccountID:   strings.TrimSpace(input.AccountID),
@@ -147,7 +143,11 @@ func (u *financialRecordUsecase) ListFinancialRecords(ctx context.Context, userI
 }
 
 func (u *financialRecordUsecase) findOwnedActiveAccount(ctx context.Context, userID string, accountID string) (*account.Account, error) {
-	acct, err := u.accounts.GetAccount(ctx, userID, strings.TrimSpace(accountID))
+	accountID = strings.TrimSpace(accountID)
+	if accountID == "" {
+		return nil, validationError("account_id", messages.MsgValidationFailed)
+	}
+	acct, err := u.accounts.GetAccount(ctx, userID, accountID)
 	if err != nil {
 		return nil, err
 	}
@@ -158,7 +158,11 @@ func (u *financialRecordUsecase) findOwnedActiveAccount(ctx context.Context, use
 }
 
 func (u *financialRecordUsecase) validateCategory(ctx context.Context, userID string, categoryID string, kind Kind) error {
-	cat, err := u.categories.GetCategory(ctx, userID, strings.TrimSpace(categoryID))
+	categoryID = strings.TrimSpace(categoryID)
+	if categoryID == "" {
+		return validationError("category_id", messages.MsgValidationFailed)
+	}
+	cat, err := u.categories.GetCategory(ctx, userID, categoryID)
 	if err != nil {
 		return err
 	}
@@ -171,9 +175,15 @@ func (u *financialRecordUsecase) validateCategory(ctx context.Context, userID st
 	return nil
 }
 
-// validateActiveReferences is the single source of truth for the kind,
-// currency, and owned active Account and Category rules shared by create and update.
+// validateActiveReferences is the single source of truth for all business and active
+// reference validation rules shared by create and update.
 func (u *financialRecordUsecase) validateActiveReferences(ctx context.Context, userID string, fields recordFields) error {
+	if fields.AmountMinor <= 0 {
+		return validationError("amount_minor", messages.MsgAmountMustBePositive)
+	}
+	if fields.Date.IsZero() {
+		return validationError("date", messages.MsgDateIsRequired)
+	}
 	if !IsValidKind(string(fields.Kind)) {
 		return validationError("kind", messages.MsgUnsupportedFinancialRecordKind)
 	}
@@ -209,15 +219,7 @@ func (u *financialRecordUsecase) UpdateFinancialRecord(ctx context.Context, user
 		return nil, validationError("record", messages.MsgFinancialRecordArchived)
 	}
 
-	// Amount and date are checked locally, ahead of validateActiveReferences'
-	// account/category lookups, so a cheap shape error short-circuits before any DB call.
 	fields := updateValues(record, input)
-	if fields.AmountMinor <= 0 {
-		return nil, validationError("amount_minor", messages.MsgValidationFailed)
-	}
-	if fields.Date.IsZero() {
-		return nil, validationError("date", messages.MsgDateIsRequired)
-	}
 	if err := u.validateActiveReferences(ctx, userID, fields); err != nil {
 		return nil, err
 	}

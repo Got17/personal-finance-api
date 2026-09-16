@@ -80,14 +80,17 @@ func TestFinancialRecordHTTP_RejectsInvalidAndForeignCreation(t *testing.T) {
 	token, _ := tokenAdapter.Sign(contract.Claims{"sub": "user-1"}, time.Hour)
 
 	for _, test := range []struct {
-		name, accountID, amount string
-		wantStatus              int
+		name, accountID, categoryID, amount, date string
+		wantStatus                                int
 	}{
-		{name: "non-positive amount", accountID: "owned-account", amount: "0", wantStatus: fiber.StatusUnprocessableEntity},
-		{name: "foreign account", accountID: "foreign-account", amount: "1", wantStatus: fiber.StatusForbidden},
+		{name: "non-positive zero amount", accountID: "owned-account", categoryID: "category-1", amount: "0", date: "2026-09-10T00:00:00Z", wantStatus: fiber.StatusUnprocessableEntity},
+		{name: "negative amount", accountID: "owned-account", categoryID: "category-1", amount: "-100", date: "2026-09-10T00:00:00Z", wantStatus: fiber.StatusUnprocessableEntity},
+		{name: "empty category", accountID: "owned-account", categoryID: "   ", amount: "100", date: "2026-09-10T00:00:00Z", wantStatus: fiber.StatusUnprocessableEntity},
+		{name: "zero date", accountID: "owned-account", categoryID: "category-1", amount: "100", date: "0001-01-01T00:00:00Z", wantStatus: fiber.StatusUnprocessableEntity},
+		{name: "foreign account", accountID: "foreign-account", categoryID: "category-1", amount: "1", date: "2026-09-10T00:00:00Z", wantStatus: fiber.StatusForbidden},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			body := `{"kind":"expense","account_id":"` + test.accountID + `","category_id":"category-1","amount_minor":` + test.amount + `,"currency":"USD","date":"2026-09-10T00:00:00Z"}`
+			body := `{"kind":"expense","account_id":"` + test.accountID + `","category_id":"` + test.categoryID + `","amount_minor":` + test.amount + `,"currency":"USD","date":"` + test.date + `"}`
 			request := httptest.NewRequest("POST", "/v1/financial-records", bytes.NewBufferString(body))
 			request.Header.Set("Authorization", "Bearer "+token)
 			request.Header.Set("Content-Type", "application/json")

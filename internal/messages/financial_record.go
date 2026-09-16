@@ -11,4 +11,5 @@ const (
 	MsgDateIsRequired                 = "date is required"
 	MsgInvalidDateRange               = "start date must not be after end date"
 	MsgFinancialRecordArchived        = "archived financial record cannot be changed"
+	MsgAmountMustBePositive           = "amount must be greater than zero"
 )
