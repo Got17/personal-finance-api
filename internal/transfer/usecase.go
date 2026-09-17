@@ -84,10 +84,14 @@ func (u *transferUsecase) CreateTransfer(ctx context.Context, userID string, inp
 			return nil, validationError("destination_amount_minor", err.Error())
 		}
 
-		if input.DestinationAmountMinor != nil && *input.DestinationAmountMinor != expectedDest {
-			return nil, validationError("destination_amount_minor", messages.MsgTransferDestinationAmountMismatch)
+		if input.DestinationAmountMinor != nil {
+			if err := fxquote.ValidatePrecision(srcAcct.Currency, destAcct.Currency, input.SourceAmountMinor, *input.DestinationAmountMinor, rate); err != nil {
+				return nil, validationError("destination_amount_minor", messages.MsgTransferDestinationAmountMismatch)
+			}
+			destAmount = *input.DestinationAmountMinor
+		} else {
+			destAmount = expectedDest
 		}
-		destAmount = expectedDest
 
 		quoteID := uuid.NewString()
 		quote = &fxquote.HistoricalFXQuote{

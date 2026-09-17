@@ -77,11 +77,23 @@ func (r *transferRepository) FindByUserID(ctx context.Context, userID string, fi
 		return nil, err
 	}
 
+	var feeIDs []string
 	for _, item := range list {
 		if item.TransferFeeRecordID != nil {
-			var feeRec financialrecord.FinancialRecord
-			if err := r.db.Session(ctx).First(&feeRec, "id = ?", *item.TransferFeeRecordID).Error; err == nil {
-				item.TransferFee = toFeeResult(&feeRec)
+			feeIDs = append(feeIDs, *item.TransferFeeRecordID)
+		}
+	}
+	if len(feeIDs) > 0 {
+		var feeRecords []financialrecord.FinancialRecord
+		if err := r.db.Session(ctx).Where("id IN ?", feeIDs).Find(&feeRecords).Error; err == nil {
+			feeMap := make(map[string]*TransferFeeResult, len(feeRecords))
+			for i := range feeRecords {
+				feeMap[feeRecords[i].ID] = toFeeResult(&feeRecords[i])
+			}
+			for _, item := range list {
+				if item.TransferFeeRecordID != nil {
+					item.TransferFee = feeMap[*item.TransferFeeRecordID]
+				}
 			}
 		}
 	}
