@@ -24,3 +24,7 @@ func (r *filteredRecords) Update(_ context.Context, record *financialrecord.Fina
 	r.items = append(r.items, record)
 	return nil
 }
+
+func strPtr(s string) *string {
+	return &s
+}

@@ -20,6 +20,8 @@ import (
 	"github.com/Got17/personal-finance-api/internal/category"
 	"github.com/Got17/personal-finance-api/internal/currency"
 	"github.com/Got17/personal-finance-api/internal/financialrecord"
+	"github.com/Got17/personal-finance-api/internal/fxquote"
+	"github.com/Got17/personal-finance-api/internal/transfer"
 	"github.com/Got17/personal-finance-api/internal/user"
 	"github.com/Got17/personal-finance-api/internal/workspace"
 )
@@ -46,7 +48,7 @@ func main() {
 	}
 	defer db.Close()
 
-	if err := db.Raw().AutoMigrate(&user.User{}, &workspace.Workspace{}, &account.Account{}, &category.Category{}, &financialrecord.FinancialRecord{}); err != nil {
+	if err := db.Raw().AutoMigrate(&user.User{}, &workspace.Workspace{}, &account.Account{}, &category.Category{}, &financialrecord.FinancialRecord{}, &fxquote.HistoricalFXQuote{}); err != nil {
 		slog.Error("automigrate failed", "error", err)
 		os.Exit(1)
 	}
@@ -80,6 +82,15 @@ func main() {
 	financialRecordUsecase := financialrecord.NewFinancialRecordUsecase(financialRecordRepo, accountUsecase, categoryUsecase)
 	financialRecordHandler := financialrecord.NewFinancialRecordHandler(financialRecordUsecase)
 
+	fxQuoteRepo := fxquote.NewFXQuoteRepository(db)
+	fxQuoteProvider := fxquote.NewReferenceRateProvider()
+	fxQuoteUsecase := fxquote.NewFXQuoteUsecase(fxQuoteRepo, fxQuoteProvider)
+	fxQuoteHandler := fxquote.NewFXQuoteHandler(fxQuoteUsecase)
+
+	transferRepo := transfer.NewTransferRepository(db)
+	transferUsecase := transfer.NewTransferUsecase(transferRepo, accountUsecase, categoryUsecase, fxQuoteProvider)
+	transferHandler := transfer.NewTransferHandler(transferUsecase)
+
 	currencyHandler := currency.NewCurrencyHandler()
 
 	app := newAPIApp(cfg.App.Name, apiHandlers{
@@ -89,6 +100,8 @@ func main() {
 		category:        categoryHandler,
 		financialRecord: financialRecordHandler,
 		currency:        currencyHandler,
+		fxQuote:         fxQuoteHandler,
+		transfer:        transferHandler,
 	}, token)
 
 	_ = cache
@@ -107,6 +120,8 @@ type apiHandlers struct {
 	category        *category.CategoryHandler
 	financialRecord *financialrecord.FinancialRecordHandler
 	currency        *currency.CurrencyHandler
+	fxQuote         *fxquote.FXQuoteHandler
+	transfer        *transfer.TransferHandler
 }
 
 func newApp(appName string) *fiber.App {
@@ -129,6 +144,7 @@ func newAPIApp(appName string, handlers apiHandlers, token contract.Token) *fibe
 	// Public routes
 	handlers.user.RegisterAuthRoutes(app.Group("/v1"))
 	handlers.currency.RegisterRoutes(app.Group("/v1"))
+	handlers.fxQuote.RegisterRoutes(app.Group("/v1"))
 
 	// Protected routes
 	api := app.Group("/v1", middleware.JWT(token))
@@ -137,6 +153,7 @@ func newAPIApp(appName string, handlers apiHandlers, token contract.Token) *fibe
 	handlers.account.RegisterRoutes(api)
 	handlers.category.RegisterRoutes(api)
 	handlers.financialRecord.RegisterRoutes(api)
+	handlers.transfer.RegisterRoutes(api)
 
 	return app
 }

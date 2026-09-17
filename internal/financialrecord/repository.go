@@ -20,7 +20,7 @@ func (r *financialRecordRepository) Create(ctx context.Context, record *Financia
 
 func (r *financialRecordRepository) FindByID(ctx context.Context, id string) (*FinancialRecord, error) {
 	var record FinancialRecord
-	if err := r.db.Session(ctx).First(&record, "id = ?", id).Error; err != nil {
+	if err := r.db.Session(ctx).Preload("HistoricalFXQuote").First(&record, "id = ?", id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrFinancialRecordNotFound
 		}
@@ -44,13 +44,13 @@ func (r *financialRecordRepository) FindByUserID(ctx context.Context, userID str
 		query = query.Where("kind = ?", filter.Kind)
 	}
 	if filter.AccountID != "" {
-		query = query.Where("account_id = ?", filter.AccountID)
+		query = query.Where("account_id = ? OR destination_account_id = ?", filter.AccountID, filter.AccountID)
 	}
 	if filter.CategoryID != "" {
 		query = query.Where("category_id = ?", filter.CategoryID)
 	}
 	var records []*FinancialRecord
-	if err := query.Order("date desc").Order("created_at desc").Find(&records).Error; err != nil {
+	if err := query.Preload("HistoricalFXQuote").Order("date desc").Order("created_at desc").Find(&records).Error; err != nil {
 		return nil, err
 	}
 	return records, nil

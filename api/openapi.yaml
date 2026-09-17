@@ -753,6 +753,102 @@ paths:
         '403': { description: The record belongs to another user. }
         '404': { description: Financial record not found. }
         '422': { description: The record is already archived. }
+  /v1/transfers:
+    post:
+      operationId: createTransfer
+      summary: Create a same- or cross-currency transfer between owned accounts
+      description: Atomically debits the source account and credits the destination account. Same-currency transfers require equal leg amounts. Cross-currency transfers validate destination amounts against the record-date or manually overridden historical FX quote precision. An optional transfer fee is recorded as a linked expense.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTransferRequest'
+      responses:
+        '201':
+          description: Transfer created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransferSuccessResponse'
+        '400': { description: The request body is malformed. }
+        '401': { description: Unauthenticated or invalid token. }
+        '403': { description: A referenced account belongs to another user. }
+        '404': { description: A referenced account or category was not found. }
+        '422': { description: Validation failed, including inactive accounts, identical source/destination, precision mismatch, or missing rate. }
+    get:
+      operationId: listTransfers
+      summary: List the authenticated user's transfers
+      description: Returns transfers newest-first by default.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/FinancialRecordStartDate'
+        - $ref: '#/components/parameters/FinancialRecordEndDate'
+        - $ref: '#/components/parameters/FinancialRecordAccountID'
+        - $ref: '#/components/parameters/FinancialRecordIncludeArchived'
+      responses:
+        '200':
+          description: Transfers list.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransferListSuccessResponse'
+        '400': { description: A query parameter is malformed. }
+        '401': { description: Unauthenticated or invalid token. }
+        '422': { description: The filter combination is invalid. }
+  /v1/transfers/{id}:
+    get:
+      operationId: getTransfer
+      summary: Retrieve one transfer
+      description: Retrieves an owned transfer with both leg amounts, historical FX quote (if cross-currency), and linked fee (if present).
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Transfer found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransferSuccessResponse'
+        '401': { description: Unauthenticated or invalid token. }
+        '403': { description: The transfer belongs to another user. }
+        '404': { description: Transfer not found. }
+  /v1/fx-quotes:
+    get:
+      operationId: getFXQuote
+      summary: Retrieve an exchange rate quote for a currency pair
+      description: Returns the exchange rate between two supported currencies for a given date. Does not require authentication.
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema:
+            $ref: '#/components/schemas/CurrencyCode'
+        - name: to
+          in: query
+          required: true
+          schema:
+            $ref: '#/components/schemas/CurrencyCode'
+        - name: date
+          in: query
+          schema: { type: string, format: date-time }
+      responses:
+        '200':
+          description: The exchange rate.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FXQuoteSuccessResponse'
+        '400': { description: Invalid query parameters. }
+        '422': { description: Unsupported currency code or unavailable rate. }
   /v1/health:
 
     get:
@@ -784,7 +880,7 @@ components:
     FinancialRecordKind:
       name: kind
       in: query
-      schema: { type: string, enum: [income, expense] }
+      schema: { type: string, enum: [income, expense, transfer] }
     FinancialRecordAccountID:
       name: account_id
       in: query
@@ -822,18 +918,24 @@ components:
         note: { type: string, maxLength: 1000 }
     FinancialRecordResponse:
       type: object
-      required: [id, user_id, kind, account_id, category_id, amount_minor, currency, date, is_active, created_at, updated_at]
+      required: [id, user_id, kind, account_id, amount_minor, currency, date, is_active, created_at, updated_at]
       properties:
         id: { type: string, format: uuid }
         user_id: { type: string, format: uuid }
-        kind: { type: string, enum: [income, expense] }
+        kind: { type: string, enum: [income, expense, transfer] }
         account_id: { type: string, format: uuid }
+        destination_account_id: { type: string, format: uuid }
         category_id: { type: string, format: uuid }
         amount_minor: { type: integer, format: int64, minimum: 1 }
+        destination_amount_minor: { type: integer, format: int64, minimum: 1 }
         currency: { $ref: '#/components/schemas/CurrencyCode' }
+        destination_currency: { $ref: '#/components/schemas/CurrencyCode' }
         date: { type: string, format: date-time }
         note: { type: string }
         is_active: { type: boolean }
+        historical_fx_quote: { $ref: '#/components/schemas/HistoricalFXQuoteResponse' }
+        transfer_fee_record_id: { type: string, format: uuid }
+        linked_transfer_id: { type: string, format: uuid }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
     FinancialRecordSuccessResponse:
@@ -851,6 +953,120 @@ components:
         data:
           type: array
           items: { $ref: '#/components/schemas/FinancialRecordResponse' }
+        message: { type: string }
+    CreateTransferRequest:
+      type: object
+      required: [source_account_id, destination_account_id, source_amount_minor, date]
+      properties:
+        source_account_id: { type: string, format: uuid, description: Active owned account to debit. }
+        destination_account_id: { type: string, format: uuid, description: Distinct active owned account to credit. }
+        source_amount_minor: { type: integer, format: int64, minimum: 1, description: Positive minor units to debit in source currency. }
+        destination_amount_minor: { type: integer, format: int64, minimum: 1, description: Positive minor units to credit in destination currency; must equal source amount for same-currency or match rate conversion precision for cross-currency. }
+        date: { type: string, format: date-time }
+        note: { type: string, maxLength: 1000 }
+        rate: { type: number, format: double, description: Optional manual exchange rate override for cross-currency transfers. }
+        fee: { $ref: '#/components/schemas/CreateTransferFeeRequest' }
+    CreateTransferFeeRequest:
+      type: object
+      required: [account_id, category_id, amount_minor]
+      properties:
+        account_id: { type: string, format: uuid, description: Active owned account charged for the fee. }
+        category_id: { type: string, format: uuid, description: Active expense category. }
+        amount_minor: { type: integer, format: int64, minimum: 1, description: Positive minor units in the fee account currency. }
+        note: { type: string, maxLength: 1000 }
+    TransferResponse:
+      type: object
+      required:
+        - id
+        - user_id
+        - kind
+        - source_account_id
+        - destination_account_id
+        - source_amount_minor
+        - destination_amount_minor
+        - source_currency
+        - destination_currency
+        - date
+        - is_active
+        - created_at
+        - updated_at
+      properties:
+        id: { type: string, format: uuid }
+        user_id: { type: string, format: uuid }
+        kind: { type: string, enum: [transfer] }
+        source_account_id: { type: string, format: uuid }
+        destination_account_id: { type: string, format: uuid }
+        source_amount_minor: { type: integer, format: int64, minimum: 1 }
+        destination_amount_minor: { type: integer, format: int64, minimum: 1 }
+        source_currency: { $ref: '#/components/schemas/CurrencyCode' }
+        destination_currency: { $ref: '#/components/schemas/CurrencyCode' }
+        date: { type: string, format: date-time }
+        note: { type: string }
+        historical_fx_quote_id: { type: string, format: uuid }
+        transfer_fee_record_id: { type: string, format: uuid }
+        is_active: { type: boolean }
+        historical_fx_quote: { $ref: '#/components/schemas/HistoricalFXQuoteResponse' }
+        transfer_fee: { $ref: '#/components/schemas/TransferFeeResponse' }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    TransferFeeResponse:
+      type: object
+      required: [id, user_id, kind, account_id, amount_minor, currency, date, is_active, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        user_id: { type: string, format: uuid }
+        kind: { type: string, enum: [expense] }
+        account_id: { type: string, format: uuid }
+        category_id: { type: string, format: uuid }
+        amount_minor: { type: integer, format: int64, minimum: 1 }
+        currency: { $ref: '#/components/schemas/CurrencyCode' }
+        date: { type: string, format: date-time }
+        note: { type: string }
+        is_active: { type: boolean }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    TransferSuccessResponse:
+      type: object
+      required: [success, data, message]
+      properties:
+        success: { type: boolean, const: true }
+        data: { $ref: '#/components/schemas/TransferResponse' }
+        message: { type: string }
+    TransferListSuccessResponse:
+      type: object
+      required: [success, data, message]
+      properties:
+        success: { type: boolean, const: true }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/TransferResponse' }
+        message: { type: string }
+    HistoricalFXQuoteResponse:
+      type: object
+      required: [id, from_currency, to_currency, rate, effective_date, provenance, record_id, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        from_currency: { $ref: '#/components/schemas/CurrencyCode' }
+        to_currency: { $ref: '#/components/schemas/CurrencyCode' }
+        rate: { type: number, format: double }
+        effective_date: { type: string, format: date-time }
+        provenance: { type: string, enum: [provider, manual_override] }
+        record_id: { type: string, format: uuid }
+        created_at: { type: string, format: date-time }
+    FXQuoteRateResponse:
+      type: object
+      required: [from_currency, to_currency, rate, date]
+      properties:
+        from_currency: { $ref: '#/components/schemas/CurrencyCode' }
+        to_currency: { $ref: '#/components/schemas/CurrencyCode' }
+        rate: { type: number, format: double }
+        date: { type: string, format: date-time }
+    FXQuoteSuccessResponse:
+      type: object
+      required: [success, data, message]
+      properties:
+        success: { type: boolean, const: true }
+        data: { $ref: '#/components/schemas/FXQuoteRateResponse' }
         message: { type: string }
     SignInRequest:
       type: object

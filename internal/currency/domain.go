@@ -41,6 +41,17 @@ func SupportedCurrencies() []Currency {
 	return out
 }
 
+// DecimalDigits returns the minor-unit decimal digits for code, or false if unsupported.
+func DecimalDigits(code string) (int, bool) {
+	norm := normalize(code)
+	for _, c := range supported {
+		if c.Code == norm {
+			return c.DecimalDigits, true
+		}
+	}
+	return 0, false
+}
+
 func normalize(code string) string {
 	out := make([]byte, 0, len(code))
 	for i := 0; i < len(code); i++ {

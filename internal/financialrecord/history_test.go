@@ -10,7 +10,6 @@ import (
 
 	"github.com/Got17/personal-finance-api/internal/category"
 	"github.com/Got17/personal-finance-api/internal/financialrecord"
-
 )
 
 type filteredRecords struct {
@@ -43,7 +42,7 @@ func (r *filteredRecords) FindByUserID(_ context.Context, userID string, filter 
 		if filter.AccountID != "" && record.AccountID != filter.AccountID {
 			continue
 		}
-		if filter.CategoryID != "" && record.CategoryID != filter.CategoryID {
+		if filter.CategoryID != "" && (record.CategoryID == nil || *record.CategoryID != filter.CategoryID) {
 			continue
 		}
 		if filter.StartDate != nil && record.Date.Before(*filter.StartDate) {
@@ -61,10 +60,10 @@ func (r *filteredRecords) FindByUserID(_ context.Context, userID string, filter 
 func TestListFinancialRecords_FiltersOwnerHistoryAndDefaultsToActive(t *testing.T) {
 	date := func(day int) time.Time { return time.Date(2026, time.September, day, 0, 0, 0, 0, time.UTC) }
 	repo := &filteredRecords{items: []*financialrecord.FinancialRecord{
-		{ID: "income", UserID: "user-1", Kind: financialrecord.KindIncome, AccountID: "account-a", CategoryID: "income-category", Date: date(10), IsActive: true},
-		{ID: "expense", UserID: "user-1", Kind: financialrecord.KindExpense, AccountID: "account-b", CategoryID: "expense-category", Date: date(11), IsActive: true},
-		{ID: "archived", UserID: "user-1", Kind: financialrecord.KindIncome, AccountID: "account-a", CategoryID: "income-category", Date: date(12), IsActive: false},
-		{ID: "foreign", UserID: "user-2", Kind: financialrecord.KindIncome, AccountID: "account-a", CategoryID: "income-category", Date: date(13), IsActive: true},
+		{ID: "income", UserID: "user-1", Kind: financialrecord.KindIncome, AccountID: "account-a", CategoryID: strPtr("income-category"), Date: date(10), IsActive: true},
+		{ID: "expense", UserID: "user-1", Kind: financialrecord.KindExpense, AccountID: "account-b", CategoryID: strPtr("expense-category"), Date: date(11), IsActive: true},
+		{ID: "archived", UserID: "user-1", Kind: financialrecord.KindIncome, AccountID: "account-a", CategoryID: strPtr("income-category"), Date: date(12), IsActive: false},
+		{ID: "foreign", UserID: "user-2", Kind: financialrecord.KindIncome, AccountID: "account-a", CategoryID: strPtr("income-category"), Date: date(13), IsActive: true},
 	}}
 	uc := financialrecord.NewFinancialRecordUsecase(repo, accounts{}, categories{})
 	start, end := date(1), date(11)
@@ -115,8 +114,6 @@ func TestListFinancialRecords_RejectsInvertedDateRange(t *testing.T) {
 	}
 }
 
-
-
 func TestCreateFinancialRecord_RejectsForeignAndInvalidReferences(t *testing.T) {
 	date := time.Date(2026, time.September, 10, 0, 0, 0, 0, time.UTC)
 	validCategory := &category.Category{ID: "category-1", UserID: "user-1", Type: category.CategoryTypeExpense, IsActive: true}
@@ -137,5 +134,3 @@ func TestCreateFinancialRecord_RejectsForeignAndInvalidReferences(t *testing.T) 
 		}
 	}
 }
-
-

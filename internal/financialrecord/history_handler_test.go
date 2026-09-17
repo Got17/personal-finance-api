@@ -18,10 +18,10 @@ import (
 func TestFinancialRecordHTTP_ListsFilteredOwnerHistory(t *testing.T) {
 	date := func(day int) time.Time { return time.Date(2026, time.September, day, 0, 0, 0, 0, time.UTC) }
 	repo := &filteredRecords{items: []*financialrecord.FinancialRecord{
-		{ID: "income", UserID: "user-1", Kind: financialrecord.KindIncome, AccountID: "account-a", CategoryID: "income-category", Date: date(10), IsActive: true},
-		{ID: "expense", UserID: "user-1", Kind: financialrecord.KindExpense, AccountID: "account-b", CategoryID: "expense-category", Date: date(11), IsActive: true},
-		{ID: "archived", UserID: "user-1", Kind: financialrecord.KindIncome, AccountID: "account-a", CategoryID: "income-category", Date: date(12), IsActive: false},
-		{ID: "foreign", UserID: "user-2", Kind: financialrecord.KindIncome, AccountID: "account-a", CategoryID: "income-category", Date: date(13), IsActive: true},
+		{ID: "income", UserID: "user-1", Kind: financialrecord.KindIncome, AccountID: "account-a", CategoryID: strPtr("income-category"), Date: date(10), IsActive: true},
+		{ID: "expense", UserID: "user-1", Kind: financialrecord.KindExpense, AccountID: "account-b", CategoryID: strPtr("expense-category"), Date: date(11), IsActive: true},
+		{ID: "archived", UserID: "user-1", Kind: financialrecord.KindIncome, AccountID: "account-a", CategoryID: strPtr("income-category"), Date: date(12), IsActive: false},
+		{ID: "foreign", UserID: "user-2", Kind: financialrecord.KindIncome, AccountID: "account-a", CategoryID: strPtr("income-category"), Date: date(13), IsActive: true},
 	}}
 	tokenAdapter := jwt.New(config.JWT{Secret: "test-secret"})
 	app := fiber.New()
