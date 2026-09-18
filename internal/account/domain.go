@@ -16,20 +16,16 @@ type AccountType string
 const (
 	AccountTypeChecking   AccountType = "checking"
 	AccountTypeSavings    AccountType = "savings"
-	AccountTypeCreditCard AccountType = "credit_card"
 	AccountTypeInvestment AccountType = "investment"
 	AccountTypeCash       AccountType = "cash"
-	AccountTypeLoan       AccountType = "loan"
 	AccountTypeOther      AccountType = "other"
 )
 
 var SupportedAccountTypes = map[AccountType]bool{
 	AccountTypeChecking:   true,
 	AccountTypeSavings:    true,
-	AccountTypeCreditCard: true,
 	AccountTypeInvestment: true,
 	AccountTypeCash:       true,
-	AccountTypeLoan:       true,
 	AccountTypeOther:      true,
 }
 

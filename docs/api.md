@@ -129,7 +129,7 @@ Financial Records, user preferences) accepts only one of these five codes.
 
 Creates a new financial account for the currently authenticated user.
 Requires a valid Bearer token in the `Authorization` header.
-Accepts `name`, `type` (`checking`, `savings`, `credit_card`, `investment`, `cash`, `loan`, `other`), `currency` (one of the supported codes from [`GET /v1/currencies`](#get-v1currencies)), optional `description`, and optional `is_active` (defaults to `true`).
+Accepts `name`, `type` (`checking`, `savings`, `investment`, `cash`, `other`), `currency` (one of the supported codes from [`GET /v1/currencies`](#get-v1currencies)), optional `description`, and optional `is_active` (defaults to `true`).
 Invalid input or unsupported account type/currency returns `422 Unprocessable Entity`.
 
 ```json
@@ -397,9 +397,11 @@ Category kinds return `422`.
 
 Lists only the caller's records, newest first by record date. It defaults to
 active records. Optional query filters are `start_date`, `end_date` (both
-`YYYY-MM-DD`), `kind`, `account_id`, `category_id`, and
-`include_archived=true`. Invalid query values return `400`; an invalid kind or
-date range returns `422`.
+`YYYY-MM-DD`), `kind` (`income`, `expense`, or `transfer`), `account_id`, `category_id`, and
+`include_archived=true`. When filtering by `account_id`, records where the account is
+either the source or destination are returned. Transfers have `category_id: null` and
+include destination account and currency details. Invalid query values return `400`;
+an invalid kind or date range returns `422`.
 
 ### `GET /v1/financial-records/:id`
 
@@ -429,6 +431,69 @@ hard-deletes financial history. Archived records remain individually retrievable
 and are returned by history only with `include_archived=true`. Cross-user archive
 requests return `403 Forbidden`; attempting to archive an already archived record
 returns `422 Unprocessable Entity`.
+
+## Transfers
+
+### `POST /v1/transfers`
+
+Executes an atomic transfer between two distinct, active, owned Accounts of the authenticated user.
+Transfers can be same-currency or cross-currency:
+- **Same-currency**: `source_currency` equals `destination_currency`. `source_amount_minor` must equal `destination_amount_minor` (or `destination_amount_minor` can be omitted, defaulting to `source_amount_minor`). No FX quote is required or stored.
+- **Cross-currency**: `source_currency` does not equal `destination_currency`. Requires either an explicit `rate` override or an automatic rate lookup from the FX quote provider for the transfer date. Destination amount is validated against currency precision: $\text{round}(\text{amount}_{src} \times \text{rate} \times 10^{\text{digits}_{dest} - \text{digits}_{src}})$. An immutable `HistoricalFXQuote` is captured and linked with provenance (`provider` or `manual_override`).
+- **Optional Fee**: An optional `fee` payload charges an active fee account in its own currency, categorized under an active expense Category. The fee is persisted atomically as a linked `expense` financial record (`linked_transfer_id`).
+- **Available Balance Validation**: Outbound transfers validate that the source account holds sufficient funds (`available_balance >= source_amount_minor`, including fee amount if charged to source). If the fee is charged to a separate account, that account must also hold sufficient balance. Returns `422 Unprocessable Entity` with descriptive top-level message (`"Source account has insufficient balance to complete the transfer"` or `"Fee account has insufficient balance to pay the transfer fee"`) along with targeted field errors (`{"source_account_id": "insufficient account balance"}` or `{"fee.account_id": "insufficient account balance"}`).
+- Transfers have no Category and do not contribute to cash-flow / Category spending totals.
+
+```json
+{
+  "source_account_id": "c7a8e999-4c0b-4ef8-bb6d-6bb9bd380a22",
+  "destination_account_id": "d8b9f000-5d1c-4fe9-cc7e-7cc0ce491b44",
+  "source_amount_minor": 10000,
+  "destination_amount_minor": 9200,
+  "date": "2026-09-15T00:00:00Z",
+  "note": "Cross-currency transfer USD -> EUR",
+  "fee": {
+    "account_id": "c7a8e999-4c0b-4ef8-bb6d-6bb9bd380a22",
+    "category_id": "e8b9f000-5d1c-4fe9-cc7e-7cc0ce491b33",
+    "amount_minor": 200,
+    "note": "Wire fee"
+  }
+}
+```
+
+Returns `201 Created` with the complete Transfer representation, including linked FX quote and fee details if applicable.
+
+### `GET /v1/transfers`
+
+Lists all transfers owned by the authenticated user, sorted by date descending.
+
+### `GET /v1/transfers/:id`
+
+Retrieves a single transfer by ID owned by the authenticated user. Foreign transfers return `403 Forbidden`; non-existent transfers return `404 Not Found`.
+
+## Foreign Exchange Quotes
+
+### `GET /v1/fx-quotes`
+
+Retrieves the reference foreign exchange rate between two supported currencies for a given date.
+
+Query parameters:
+- `from`: Source currency code (e.g. `USD`). Required.
+- `to`: Destination currency code (e.g. `EUR`). Required.
+- `date`: Date in RFC 3339 format or `YYYY-MM-DD`. Optional (defaults to current UTC date).
+
+```json
+{
+  "success": true,
+  "data": {
+    "from_currency": "USD",
+    "to_currency": "EUR",
+    "rate": 0.92,
+    "date": "2026-09-15T00:00:00Z"
+  },
+  "message": ""
+}
+```
 
 ## Health
 

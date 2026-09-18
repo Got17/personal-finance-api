@@ -18,6 +18,8 @@ import (
 	"github.com/Got17/personal-finance-api/internal/category"
 	"github.com/Got17/personal-finance-api/internal/currency"
 	"github.com/Got17/personal-finance-api/internal/financialrecord"
+	"github.com/Got17/personal-finance-api/internal/fxquote"
+	"github.com/Got17/personal-finance-api/internal/transfer"
 	"github.com/Got17/personal-finance-api/internal/user"
 	"github.com/Got17/personal-finance-api/internal/workspace"
 )
@@ -785,6 +787,14 @@ func testFinancialRecordHandler() *financialrecord.FinancialRecordHandler {
 	return financialrecord.NewFinancialRecordHandler(nil)
 }
 
+func testTransferHandler() *transfer.TransferHandler {
+	return transfer.NewTransferHandler(nil)
+}
+
+func testFXQuoteHandler() *fxquote.FXQuoteHandler {
+	return fxquote.NewFXQuoteHandler(fxquote.NewFXQuoteUsecase(nil, fxquote.NewReferenceRateProvider()))
+}
+
 func newTestAPIApp(token contract.Token, uHandler *user.UserHandler, wHandler *workspace.WorkspaceHandler, acctHandler *account.AccountHandler, catHandler *category.CategoryHandler) *fiber.App {
 	return newAPIApp("personal-finance-api", apiHandlers{
 		user:            uHandler,
@@ -793,5 +803,238 @@ func newTestAPIApp(token contract.Token, uHandler *user.UserHandler, wHandler *w
 		category:        catHandler,
 		financialRecord: testFinancialRecordHandler(),
 		currency:        currency.NewCurrencyHandler(),
+		fxQuote:         testFXQuoteHandler(),
+		transfer:        testTransferHandler(),
 	}, token)
+}
+
+type mainTestTransferRepo struct {
+	transfers  map[string]*transfer.Transfer
+	quotes     map[string]*fxquote.HistoricalFXQuote
+	feeRecords map[string]*financialrecord.FinancialRecord
+}
+
+func (m *mainTestTransferRepo) CreateTransferWithLegsAndFee(_ context.Context, t *transfer.Transfer, q *fxquote.HistoricalFXQuote, fee *financialrecord.FinancialRecord) error {
+	if m.transfers == nil {
+		m.transfers = make(map[string]*transfer.Transfer)
+	}
+	if m.quotes == nil {
+		m.quotes = make(map[string]*fxquote.HistoricalFXQuote)
+	}
+	if m.feeRecords == nil {
+		m.feeRecords = make(map[string]*financialrecord.FinancialRecord)
+	}
+	m.transfers[t.ID] = t
+	if q != nil {
+		m.quotes[q.ID] = q
+	}
+	if fee != nil {
+		m.feeRecords[fee.ID] = fee
+	}
+	return nil
+}
+
+func (m *mainTestTransferRepo) FindByID(_ context.Context, id string) (*transfer.Transfer, error) {
+	t, ok := m.transfers[id]
+	if !ok {
+		return nil, transfer.ErrTransferNotFound
+	}
+	res := *t
+	if t.HistoricalFXQuoteID != nil {
+		res.HistoricalFXQuote = m.quotes[*t.HistoricalFXQuoteID]
+	}
+	if t.TransferFeeRecordID != nil {
+		if fee, ok := m.feeRecords[*t.TransferFeeRecordID]; ok {
+			catID := ""
+			if fee.CategoryID != nil {
+				catID = *fee.CategoryID
+			}
+			res.TransferFee = &transfer.TransferFeeResult{
+				ID:          fee.ID,
+				UserID:      fee.UserID,
+				Kind:        string(fee.Kind),
+				AccountID:   fee.AccountID,
+				CategoryID:  catID,
+				AmountMinor: fee.AmountMinor,
+				Currency:    fee.Currency,
+				Date:        fee.Date,
+				Note:        fee.Note,
+				IsActive:    fee.IsActive,
+				CreatedAt:   fee.CreatedAt,
+				UpdatedAt:   fee.UpdatedAt,
+			}
+		}
+	}
+	return &res, nil
+}
+
+func (m *mainTestTransferRepo) FindByUserID(_ context.Context, userID string, filter transfer.ListTransferFilter) ([]*transfer.Transfer, error) {
+	var list []*transfer.Transfer
+	for _, t := range m.transfers {
+		if t.UserID == userID {
+			if !filter.IncludeArchived && !t.IsActive {
+				continue
+			}
+			list = append(list, t)
+		}
+	}
+	return list, nil
+}
+
+func (m *mainTestTransferRepo) GetAccountBalance(_ context.Context, _ string, _ string) (int64, error) {
+	return 1_000_000, nil
+}
+
+type mainTestFXQuoteRepo struct {
+	quotes map[string]*fxquote.HistoricalFXQuote
+}
+
+func (m *mainTestFXQuoteRepo) Create(_ context.Context, q *fxquote.HistoricalFXQuote) error {
+	if m.quotes == nil {
+		m.quotes = make(map[string]*fxquote.HistoricalFXQuote)
+	}
+	m.quotes[q.ID] = q
+	return nil
+}
+
+func (m *mainTestFXQuoteRepo) FindByID(_ context.Context, id string) (*fxquote.HistoricalFXQuote, error) {
+	q, ok := m.quotes[id]
+	if !ok {
+		return nil, fxquote.ErrFXQuoteNotFound
+	}
+	return q, nil
+}
+
+func (m *mainTestFXQuoteRepo) FindByRecordID(_ context.Context, recordID string) (*fxquote.HistoricalFXQuote, error) {
+	for _, q := range m.quotes {
+		if q.RecordID == recordID {
+			return q, nil
+		}
+	}
+	return nil, fxquote.ErrFXQuoteNotFound
+}
+
+func TestConfiguredApp_TransfersAndQuotes(t *testing.T) {
+	token := jwt.New(config.JWT{Secret: "test-secret"})
+	userRepo := &mainTestUserRepo{user: &user.User{ID: "user-1", Email: "user1@example.com"}}
+	uHandler := user.NewUserHandler(user.NewUserUsecase(userRepo, token))
+	wHandler := workspace.NewWorkspaceHandler(workspace.NewWorkspaceUsecase(&mainTestWorkspaceRepo{}))
+
+	acctRepo := &mainTestAccountRepo{accounts: map[string]*account.Account{
+		"acct-usd-1":  {ID: "acct-usd-1", UserID: "user-1", Name: "Checking", Type: "checking", Currency: "USD", IsActive: true},
+		"acct-usd-2":  {ID: "acct-usd-2", UserID: "user-1", Name: "Savings", Type: "savings", Currency: "USD", IsActive: true},
+		"acct-eur-1":  {ID: "acct-eur-1", UserID: "user-1", Name: "Euro Vault", Type: "checking", Currency: "EUR", IsActive: true},
+		"acct-user-2": {ID: "acct-user-2", UserID: "user-2", Name: "Foreign", Type: "checking", Currency: "USD", IsActive: true},
+	}}
+	acctUsecase := account.NewAccountUsecase(acctRepo)
+	acctHandler := account.NewAccountHandler(acctUsecase)
+
+	catRepo := &mainTestCategoryRepo{categories: map[string]*category.Category{
+		"cat-fee": {ID: "cat-fee", UserID: "user-1", Name: "Bank Fees", Type: category.CategoryTypeExpense, IsActive: true},
+	}}
+	catUsecase := category.NewCategoryUsecase(catRepo)
+	catHandler := category.NewCategoryHandler(catUsecase)
+
+	transferRepo := &mainTestTransferRepo{}
+	fxProvider := fxquote.NewReferenceRateProvider()
+	fxUsecase := fxquote.NewFXQuoteUsecase(&mainTestFXQuoteRepo{}, fxProvider)
+	fxHandler := fxquote.NewFXQuoteHandler(fxUsecase)
+
+	trUsecase := transfer.NewTransferUsecase(transferRepo, acctUsecase, catUsecase, fxProvider)
+	trHandler := transfer.NewTransferHandler(trUsecase)
+
+	app := newAPIApp("personal-finance-api", apiHandlers{
+		user:            uHandler,
+		workspace:       wHandler,
+		account:         acctHandler,
+		category:        catHandler,
+		financialRecord: testFinancialRecordHandler(),
+		currency:        currency.NewCurrencyHandler(),
+		fxQuote:         fxHandler,
+		transfer:        trHandler,
+	}, token)
+
+	tokenStr, _ := token.Sign(contract.Claims{"sub": "user-1"}, time.Hour)
+	authHeader := "Bearer " + tokenStr
+
+	// 1. Create same-currency transfer
+	sameReqBody := `{"source_account_id":"acct-usd-1","destination_account_id":"acct-usd-2","source_amount_minor":5000,"date":"2026-09-10T12:00:00Z","note":"Move to savings"}`
+	req := httptest.NewRequest("POST", "/v1/transfers", bytes.NewBufferString(sameReqBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", authHeader)
+	resp, err := app.Test(req)
+	if err != nil || resp.StatusCode != 201 {
+		t.Fatalf("create same-currency transfer status = %d, want 201: %v", resp.StatusCode, err)
+	}
+
+	// 2. Create cross-currency transfer with fee
+	crossReqBody := `{
+		"source_account_id":"acct-usd-1",
+		"destination_account_id":"acct-eur-1",
+		"source_amount_minor":1000,
+		"destination_amount_minor":920,
+		"date":"2026-09-10T12:00:00Z",
+		"fee": {
+			"account_id":"acct-usd-1",
+			"category_id":"cat-fee",
+			"amount_minor":25,
+			"note":"FX conversion fee"
+		}
+	}`
+	req = httptest.NewRequest("POST", "/v1/transfers", bytes.NewBufferString(crossReqBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", authHeader)
+	resp, err = app.Test(req)
+	if err != nil || resp.StatusCode != 201 {
+		t.Fatalf("create cross-currency transfer status = %d, want 201: %v", resp.StatusCode, err)
+	}
+
+	var crossResp struct {
+		Data *transfer.Transfer `json:"data"`
+	}
+	_ = json.NewDecoder(resp.Body).Decode(&crossResp)
+	createdTransferID := crossResp.Data.ID
+
+	// 3. Retrieve the created transfer
+	req = httptest.NewRequest("GET", "/v1/transfers/"+createdTransferID, nil)
+	req.Header.Set("Authorization", authHeader)
+	resp, err = app.Test(req)
+	if err != nil || resp.StatusCode != 200 {
+		t.Fatalf("get transfer status = %d, want 200: %v", resp.StatusCode, err)
+	}
+
+	// 4. List transfers
+	req = httptest.NewRequest("GET", "/v1/transfers", nil)
+	req.Header.Set("Authorization", authHeader)
+	resp, err = app.Test(req)
+	if err != nil || resp.StatusCode != 200 {
+		t.Fatalf("list transfers status = %d, want 200: %v", resp.StatusCode, err)
+	}
+
+	// 5. Query FX Quote endpoint
+	req = httptest.NewRequest("GET", "/v1/fx-quotes?from=USD&to=EUR&date=2026-09-10", nil)
+	resp, err = app.Test(req)
+	if err != nil || resp.StatusCode != 200 {
+		t.Fatalf("get fx-quotes status = %d, want 200: %v", resp.StatusCode, err)
+	}
+
+	// 6. Validation: Same account returns 422
+	sameAcctBody := `{"source_account_id":"acct-usd-1","destination_account_id":"acct-usd-1","source_amount_minor":1000,"date":"2026-09-10T12:00:00Z"}`
+	req = httptest.NewRequest("POST", "/v1/transfers", bytes.NewBufferString(sameAcctBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", authHeader)
+	resp, _ = app.Test(req)
+	if resp.StatusCode != 422 {
+		t.Errorf("same account transfer status = %d, want 422", resp.StatusCode)
+	}
+
+	// 7. Validation: Foreign account returns 403
+	foreignAcctBody := `{"source_account_id":"acct-usd-1","destination_account_id":"acct-user-2","source_amount_minor":1000,"date":"2026-09-10T12:00:00Z"}`
+	req = httptest.NewRequest("POST", "/v1/transfers", bytes.NewBufferString(foreignAcctBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", authHeader)
+	resp, _ = app.Test(req)
+	if resp.StatusCode != 403 {
+		t.Errorf("foreign account transfer status = %d, want 403", resp.StatusCode)
+	}
 }

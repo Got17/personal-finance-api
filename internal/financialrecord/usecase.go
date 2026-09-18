@@ -80,12 +80,17 @@ func (u *financialRecordUsecase) CreateFinancialRecord(ctx context.Context, user
 		return nil, err
 	}
 
+	var catID *string
+	if fields.CategoryID != "" {
+		c := fields.CategoryID
+		catID = &c
+	}
 	record := &FinancialRecord{
 		ID:          uuid.NewString(),
 		UserID:      userID,
 		Kind:        fields.Kind,
 		AccountID:   fields.AccountID,
-		CategoryID:  fields.CategoryID,
+		CategoryID:  catID,
 		AmountMinor: fields.AmountMinor,
 		Currency:    fields.Currency,
 		Date:        fields.Date,
@@ -224,7 +229,12 @@ func (u *financialRecordUsecase) UpdateFinancialRecord(ctx context.Context, user
 		return nil, err
 	}
 
-	record.Kind, record.AccountID, record.CategoryID = fields.Kind, fields.AccountID, fields.CategoryID
+	var catID *string
+	if fields.CategoryID != "" {
+		c := fields.CategoryID
+		catID = &c
+	}
+	record.Kind, record.AccountID, record.CategoryID = fields.Kind, fields.AccountID, catID
 	record.AmountMinor, record.Currency, record.Date, record.Note = fields.AmountMinor, fields.Currency, fields.Date, fields.Note
 	if err := u.records.Update(ctx, record); err != nil {
 		return nil, err
@@ -250,10 +260,14 @@ func (u *financialRecordUsecase) ArchiveFinancialRecord(ctx context.Context, use
 // updateValues overlays the changed fields from input onto record's current
 // values, so validateActiveReferences always sees the full post-update state.
 func updateValues(record *FinancialRecord, input *UpdateFinancialRecordInput) recordFields {
+	currentCatID := ""
+	if record.CategoryID != nil {
+		currentCatID = *record.CategoryID
+	}
 	fields := recordFields{
 		Kind:        record.Kind,
 		AccountID:   record.AccountID,
-		CategoryID:  record.CategoryID,
+		CategoryID:  currentCatID,
 		AmountMinor: record.AmountMinor,
 		Currency:    record.Currency,
 		Date:        record.Date,

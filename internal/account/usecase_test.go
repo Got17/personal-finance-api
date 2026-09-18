@@ -124,6 +124,28 @@ func TestCreateAccount_InvalidType(t *testing.T) {
 	}
 }
 
+func TestCreateAccount_RemovedCreditAndLoanTypes(t *testing.T) {
+	repo := newMockAccountRepo()
+	uc := account.NewAccountUsecase(repo)
+
+	for _, removedType := range []string{"credit_card", "loan"} {
+		input := &account.CreateAccountInput{
+			Name:     "Test Account",
+			Type:     removedType,
+			Currency: "USD",
+		}
+
+		_, err := uc.CreateAccount(context.Background(), "user-123", input)
+		if err == nil {
+			t.Fatalf("expected error for removed type %q, got nil", removedType)
+		}
+		ae, ok := errs.IsAppError(err)
+		if !ok || ae.Status != 422 {
+			t.Fatalf("expected 422 AppError for type %q, got %#v", removedType, err)
+		}
+	}
+}
+
 func TestCreateAccount_InvalidCurrency(t *testing.T) {
 	repo := newMockAccountRepo()
 	uc := account.NewAccountUsecase(repo)
@@ -198,7 +220,7 @@ func TestListAccounts_Isolation(t *testing.T) {
 		Name: "User 1 Savings", Type: "savings", Currency: "USD",
 	})
 	_, _ = uc.CreateAccount(context.Background(), "user-2", &account.CreateAccountInput{
-		Name: "User 2 Account", Type: "credit_card", Currency: "EUR",
+		Name: "User 2 Account", Type: "cash", Currency: "EUR",
 	})
 
 	user1Accounts, err := uc.ListAccounts(context.Background(), "user-1")

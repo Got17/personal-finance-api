@@ -79,15 +79,26 @@ func TestRespondError_AppErrorAndUnexpectedError(t *testing.T) {
 		return httputil.RespondError(c, errors.New("db crash"))
 	})
 
-	// App error
+	// App error with custom message
 	req1 := httptest.NewRequest("GET", "/app-err", nil)
 	resp1, err := app.Test(req1)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
-	resp1.Body.Close()
+	defer resp1.Body.Close()
 	if resp1.StatusCode != 404 {
 		t.Fatalf("status = %d, want 404", resp1.StatusCode)
+	}
+	var appBody struct {
+		Success bool   `json:"success"`
+		Error   string `json:"error"`
+		Message string `json:"message"`
+	}
+	if err := json.NewDecoder(resp1.Body).Decode(&appBody); err != nil {
+		t.Fatalf("decode app-err response: %v", err)
+	}
+	if appBody.Message != "resource not found" {
+		t.Fatalf("appBody.Message = %q, want 'resource not found'", appBody.Message)
 	}
 
 	// Unexpected internal error

@@ -21,7 +21,7 @@ func setupValidationUsecase() (financialrecord.FinancialRecordUsecase, *editable
 			UserID:      "user-1",
 			Kind:        financialrecord.KindExpense,
 			AccountID:   "acct-1",
-			CategoryID:  "cat-expense",
+			CategoryID:  strPtr("cat-expense"),
 			AmountMinor: 5000,
 			Currency:    "USD",
 			Date:        time.Date(2026, 9, 10, 0, 0, 0, 0, time.UTC),
@@ -34,8 +34,8 @@ func setupValidationUsecase() (financialrecord.FinancialRecordUsecase, *editable
 			"acct-1": {ID: "acct-1", UserID: "user-1", Currency: "USD", IsActive: true},
 		},
 		categories{
-			"cat-expense": {ID: "cat-expense", UserID: "user-1", Type: category.CategoryTypeExpense, IsActive: true},
-			"cat-income":  {ID: "cat-income", UserID: "user-1", Type: category.CategoryTypeIncome, IsActive: true},
+			"cat-expense":  {ID: "cat-expense", UserID: "user-1", Type: category.CategoryTypeExpense, IsActive: true},
+			"cat-income":   {ID: "cat-income", UserID: "user-1", Type: category.CategoryTypeIncome, IsActive: true},
 			"cat-inactive": {ID: "cat-inactive", UserID: "user-1", Type: category.CategoryTypeExpense, IsActive: false},
 		},
 	)

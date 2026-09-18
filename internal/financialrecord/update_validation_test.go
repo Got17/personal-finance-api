@@ -9,12 +9,11 @@ import (
 
 	"github.com/Got17/personal-finance-api/internal/category"
 	"github.com/Got17/personal-finance-api/internal/financialrecord"
-
 )
 
 func TestUpdateFinancialRecord_RejectsInvalidReplacementReferences(t *testing.T) {
 	repo := &editableRecords{items: map[string]*financialrecord.FinancialRecord{
-		"record-1": {ID: "record-1", UserID: "user-1", Kind: financialrecord.KindExpense, AccountID: "account-1", CategoryID: "expense-category", AmountMinor: 100, Currency: "USD", Date: time.Date(2026, 9, 10, 0, 0, 0, 0, time.UTC), IsActive: true},
+		"record-1": {ID: "record-1", UserID: "user-1", Kind: financialrecord.KindExpense, AccountID: "account-1", CategoryID: strPtr("expense-category"), AmountMinor: 100, Currency: "USD", Date: time.Date(2026, 9, 10, 0, 0, 0, 0, time.UTC), IsActive: true},
 	}}
 	uc := financialrecord.NewFinancialRecordUsecase(repo,
 		accounts{
@@ -45,5 +44,3 @@ func TestUpdateFinancialRecord_RejectsInvalidReplacementReferences(t *testing.T)
 		}
 	}
 }
-
-

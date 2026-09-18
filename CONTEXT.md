@@ -5,7 +5,7 @@ The core domain for personal financial tracking, multi-currency budgeting, and l
 ## Language
 
 **Account**:
-A financial holding or liability container owned by a user with an ISO 4217 currency.
+A financial asset holding owned by a user with an ISO 4217 currency.
 _Avoid_: Bank, wallet, fund
 
 **Category**:
@@ -19,3 +19,11 @@ _Avoid_: Transaction, ledger item, entry
 **Active Reference**:
 An Account or Category that is owned by the authenticated user and currently active (`is_active = true`), permitting new or updated Financial Records to link to it.
 _Avoid_: Valid foreign key, live target, valid reference
+
+**Account Balance**:
+The net cumulative sum of all active inflows (incomes and incoming transfers) minus active outflows (expenses, outgoing transfers, and transfer fees) for an Account in its currency.
+_Avoid_: Account amount, total funds, cash balance
+
+**Transfer**:
+A money movement between two distinct owned Accounts, recording a debit leg, a credit leg, and optional fee/FX quote.
+_Avoid_: Transaction, remittance, internal payment

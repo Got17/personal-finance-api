@@ -1,4 +1,4 @@
-﻿package currency_test
+package currency_test
 
 import (
 	"testing"
@@ -65,5 +65,28 @@ func TestSupportedCurrencies_IsMutable(t *testing.T) {
 	second := currency.SupportedCurrencies()
 	if second[0].Code != "LAK" {
 		t.Errorf("SupportedCurrencies returned the internal slice (mutation leaked)")
+	}
+}
+
+func TestDecimalDigits(t *testing.T) {
+	tests := []struct {
+		code   string
+		digits int
+		ok     bool
+	}{
+		{"LAK", 0, true},
+		{"lak", 0, true},
+		{"THB", 2, true},
+		{"USD", 2, true},
+		{"CNY", 2, true},
+		{"EUR", 2, true},
+		{"GBP", 0, false},
+		{"", 0, false},
+	}
+	for _, tt := range tests {
+		digits, ok := currency.DecimalDigits(tt.code)
+		if ok != tt.ok || digits != tt.digits {
+			t.Errorf("DecimalDigits(%q) = (%d, %v), want (%d, %v)", tt.code, digits, ok, tt.digits, tt.ok)
+		}
 	}
 }
