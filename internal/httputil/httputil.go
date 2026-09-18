@@ -56,9 +56,11 @@ func RespondUnauthorized(c *fiber.Ctx) error {
 // Unexpected errors are logged server-side and a generic internal error message is returned.
 func RespondError(c *fiber.Ctx, err error) error {
 	if ae, ok := errs.IsAppError(err); ok {
-		msg := i18n.Translate(Locale(c), ae.Code)
-		if msg == "" {
-			msg = ae.Message
+		msg := ae.Message
+		if translated := i18n.Translate(Locale(c), ae.Message); translated != "" {
+			msg = translated
+		} else if msg == "" {
+			msg = i18n.Translate(Locale(c), ae.Code)
 		}
 		resp := response.Error(ae.Code, msg)
 		if ae.Data != nil {

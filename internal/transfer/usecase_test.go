@@ -10,6 +10,7 @@ import (
 
 	"github.com/Got17/personal-finance-api/internal/financialrecord"
 	"github.com/Got17/personal-finance-api/internal/fxquote"
+	"github.com/Got17/personal-finance-api/internal/messages"
 	"github.com/Got17/personal-finance-api/internal/transfer"
 )
 
@@ -332,6 +333,9 @@ func TestCreateTransfer_ZeroBalance_Fails(t *testing.T) {
 	if !ok || appErr.Status != 422 {
 		t.Fatalf("expected 422 AppError, got %#v", err)
 	}
+	if appErr.Message != messages.MsgInsufficientSourceAccountBalance {
+		t.Errorf("expected message %q, got %q", messages.MsgInsufficientSourceAccountBalance, appErr.Message)
+	}
 	fieldsMap, ok := appErr.Data.(map[string]string)
 	if !ok || fieldsMap["source_account_id"] != "insufficient account balance" {
 		t.Errorf("expected source_account_id error 'insufficient account balance', got %v", appErr.Data)
@@ -355,6 +359,9 @@ func TestCreateTransfer_ExceedingBalance_Fails(t *testing.T) {
 	appErr, ok := errs.IsAppError(err)
 	if !ok || appErr.Status != 422 {
 		t.Fatalf("expected 422 AppError, got %#v", err)
+	}
+	if appErr.Message != messages.MsgInsufficientSourceAccountBalance {
+		t.Errorf("expected message %q, got %q", messages.MsgInsufficientSourceAccountBalance, appErr.Message)
 	}
 	fieldsMap, ok := appErr.Data.(map[string]string)
 	if !ok || fieldsMap["source_account_id"] != "insufficient account balance" {
@@ -385,6 +392,9 @@ func TestCreateTransfer_FeeExceedingSourceBalance_Fails(t *testing.T) {
 	if !ok || appErr.Status != 422 {
 		t.Fatalf("expected 422 AppError, got %#v", err)
 	}
+	if appErr.Message != messages.MsgInsufficientSourceAccountBalance {
+		t.Errorf("expected message %q, got %q", messages.MsgInsufficientSourceAccountBalance, appErr.Message)
+	}
 	fieldsMap, ok := appErr.Data.(map[string]string)
 	if !ok || fieldsMap["source_account_id"] != "insufficient account balance" {
 		t.Errorf("expected source_account_id error 'insufficient account balance', got %v", appErr.Data)
@@ -414,6 +424,9 @@ func TestCreateTransfer_FeeExceedingDistinctFeeAccountBalance_Fails(t *testing.T
 	appErr, ok := errs.IsAppError(err)
 	if !ok || appErr.Status != 422 {
 		t.Fatalf("expected 422 AppError, got %#v", err)
+	}
+	if appErr.Message != messages.MsgInsufficientFeeAccountBalance {
+		t.Errorf("expected message %q, got %q", messages.MsgInsufficientFeeAccountBalance, appErr.Message)
 	}
 	fieldsMap, ok := appErr.Data.(map[string]string)
 	if !ok || fieldsMap["fee.account_id"] != "insufficient account balance" {

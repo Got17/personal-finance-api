@@ -137,10 +137,16 @@ func (u *transferUsecase) CreateTransfer(ctx context.Context, userID string, inp
 
 	if err := u.repo.CreateTransferWithLegsAndFee(ctx, t, quote, feeRecord); err != nil {
 		if errors.Is(err, ErrInsufficientAccountBalance) {
-			return nil, validationError("source_account_id", messages.MsgInsufficientAccountBalance)
+			return nil, errs.UnprocessableFields(
+				messages.MsgInsufficientSourceAccountBalance,
+				map[string]string{"source_account_id": messages.MsgInsufficientAccountBalance},
+			)
 		}
 		if errors.Is(err, ErrInsufficientFeeAccountBalance) {
-			return nil, validationError("fee.account_id", messages.MsgInsufficientAccountBalance)
+			return nil, errs.UnprocessableFields(
+				messages.MsgInsufficientFeeAccountBalance,
+				map[string]string{"fee.account_id": messages.MsgInsufficientAccountBalance},
+			)
 		}
 		return nil, err
 	}
@@ -270,5 +276,5 @@ func toFeeResult(f *financialrecord.FinancialRecord) *TransferFeeResult {
 }
 
 func validationError(field string, message string) error {
-	return errs.UnprocessableFields(messages.MsgValidationFailed, map[string]string{field: message})
+	return errs.UnprocessableFields(message, map[string]string{field: message})
 }

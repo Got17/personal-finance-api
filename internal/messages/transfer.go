@@ -10,6 +10,7 @@ const (
 	MsgFXQuoteNotFound                   = "fx quote not found"
 	MsgFXRateUnavailable                 = "exchange rate is unavailable for the requested currency pair and date"
 	MsgInsufficientAccountBalance        = "insufficient account balance"
-	MsgInsufficientFeeAccountBalance     = "insufficient fee account balance"
+	MsgInsufficientSourceAccountBalance  = "source account has insufficient balance to complete the transfer"
+	MsgInsufficientFeeAccountBalance     = "fee account has insufficient balance to pay the transfer fee"
 )
 
