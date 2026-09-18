@@ -21,13 +21,13 @@ func NewTransferRepository(db contract.ORM) TransferRepository {
 
 func (r *transferRepository) CreateTransferWithLegsAndFee(ctx context.Context, t *Transfer, quote *fxquote.HistoricalFXQuote, fee *financialrecord.FinancialRecord) error {
 	return r.db.Session(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Create(t).Error; err != nil {
-			return err
-		}
 		if quote != nil {
 			if err := tx.Create(quote).Error; err != nil {
 				return err
 			}
+		}
+		if err := tx.Omit("HistoricalFXQuote").Create(t).Error; err != nil {
+			return err
 		}
 		if fee != nil {
 			if err := tx.Create(fee).Error; err != nil {

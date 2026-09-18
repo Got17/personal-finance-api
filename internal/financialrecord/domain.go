@@ -39,7 +39,7 @@ type FinancialRecord struct {
 	TransferFeeRecordID    *string                    `json:"transfer_fee_record_id,omitempty"  gorm:"type:uuid;index"`
 	LinkedTransferID       *string                    `json:"linked_transfer_id,omitempty"      gorm:"type:uuid;index"`
 	IsActive               bool                       `json:"is_active"                         gorm:"not null;default:true;index"`
-	HistoricalFXQuote      *fxquote.HistoricalFXQuote `json:"historical_fx_quote,omitempty"     gorm:"foreignKey:HistoricalFXQuoteID"`
+	HistoricalFXQuote      *fxquote.HistoricalFXQuote `json:"historical_fx_quote,omitempty"     gorm:"->;foreignKey:HistoricalFXQuoteID"`
 	CreatedAt              time.Time                  `json:"created_at"                        gorm:"autoCreateTime"`
 	UpdatedAt              time.Time                  `json:"updated_at"                        gorm:"autoUpdateTime"`
 }

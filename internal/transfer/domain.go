@@ -34,7 +34,7 @@ type Transfer struct {
 	HistoricalFXQuoteID    *string                    `json:"historical_fx_quote_id,omitempty"  gorm:"type:uuid;index"`
 	TransferFeeRecordID    *string                    `json:"transfer_fee_record_id,omitempty"  gorm:"type:uuid;index"`
 	IsActive               bool                       `json:"is_active"               gorm:"not null;default:true;index"`
-	HistoricalFXQuote      *fxquote.HistoricalFXQuote `json:"historical_fx_quote,omitempty"     gorm:"foreignKey:HistoricalFXQuoteID"`
+	HistoricalFXQuote      *fxquote.HistoricalFXQuote `json:"historical_fx_quote,omitempty"     gorm:"->;foreignKey:HistoricalFXQuoteID"`
 	TransferFee            *TransferFeeResult         `json:"transfer_fee,omitempty"   gorm:"-"`
 	CreatedAt              time.Time                  `json:"created_at"              gorm:"autoCreateTime"`
 	UpdatedAt              time.Time                  `json:"updated_at"              gorm:"autoUpdateTime"`
