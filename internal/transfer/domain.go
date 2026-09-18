@@ -16,7 +16,7 @@ var (
 	ErrTransferNotFound              = errors.New("transfer not found")
 	ErrTransferAccessDenied          = errors.New(messages.MsgTransferAccessDenied)
 	ErrInsufficientAccountBalance    = errors.New(messages.MsgInsufficientAccountBalance)
-	ErrInsufficientFeeAccountBalance = errors.New("insufficient fee account balance")
+	ErrInsufficientFeeAccountBalance = errors.New(messages.MsgInsufficientFeeAccountBalance)
 )
 
 // Transfer represents a money movement between two distinct owned accounts.
@@ -100,7 +100,6 @@ type TransferRepository interface {
 	CreateTransferWithLegsAndFee(ctx context.Context, transfer *Transfer, quote *fxquote.HistoricalFXQuote, fee *financialrecord.FinancialRecord) error
 	FindByID(ctx context.Context, id string) (*Transfer, error)
 	FindByUserID(ctx context.Context, userID string, filter ListTransferFilter) ([]*Transfer, error)
-	GetAccountBalance(ctx context.Context, userID string, accountID string) (int64, error)
 }
 
 type TransferUsecase interface {

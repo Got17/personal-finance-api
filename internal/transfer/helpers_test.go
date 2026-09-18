@@ -3,6 +3,7 @@ package transfer_test
 import (
 	"context"
 	"errors"
+	"sync"
 
 	"github.com/Got17/personal-finance-api/internal/account"
 	"github.com/Got17/personal-finance-api/internal/category"
@@ -42,6 +43,7 @@ func (m *mockCategoryReader) GetCategory(_ context.Context, userID string, categ
 }
 
 type mockTransferRepo struct {
+	mu              sync.Mutex
 	transfers       map[string]*transfer.Transfer
 	quotes          map[string]*fxquote.HistoricalFXQuote
 	feeRecords      map[string]*financialrecord.FinancialRecord
@@ -59,14 +61,21 @@ func newMockTransferRepo() *mockTransferRepo {
 }
 
 func (m *mockTransferRepo) SetAccountBalance(accountID string, balance int64) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.accountBalances[accountID] = balance
 }
 
 func (m *mockTransferRepo) GetAccountBalance(_ context.Context, _ string, accountID string) (int64, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	return m.accountBalances[accountID], nil
 }
 
 func (m *mockTransferRepo) CreateTransferWithLegsAndFee(_ context.Context, t *transfer.Transfer, q *fxquote.HistoricalFXQuote, fee *financialrecord.FinancialRecord) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	if m.failOnCreate {
 		return errors.New("database transaction failed")
 	}

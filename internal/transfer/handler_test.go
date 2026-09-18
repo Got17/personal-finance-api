@@ -249,3 +249,48 @@ func TestTransferHTTP_InsufficientBalance_Returns422(t *testing.T) {
 		t.Errorf("expected source_account_id error 'insufficient account balance', got %v", respBody.Data)
 	}
 }
+
+func TestTransferHTTP_FeeAccountInsufficientBalance_Returns422(t *testing.T) {
+	f := setupTransferHandlerFixture()
+	token := f.issueToken("user-1")
+
+	// acct-usd-1 has 10_000_000, acct-usd-2 has 0 balance
+	// Fee is charged to acct-usd-2 with amount 500 > 0
+	body, _ := json.Marshal(transfer.CreateTransferInput{
+		SourceAccountID:      "acct-usd-1",
+		DestinationAccountID: "acct-eur-1",
+		SourceAmountMinor:    1000,
+		Date:                 time.Date(2026, 9, 15, 10, 0, 0, 0, time.UTC),
+		Fee: &transfer.TransferFeeInput{
+			AccountID:   "acct-usd-2",
+			CategoryID:  "cat-expense",
+			AmountMinor: 500,
+		},
+	})
+	req := httptest.NewRequest("POST", "/v1/transfers", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := f.app.Test(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != fiber.StatusUnprocessableEntity {
+		t.Errorf("status = %d, want %d", resp.StatusCode, fiber.StatusUnprocessableEntity)
+	}
+
+	var respBody struct {
+		Success bool              `json:"success"`
+		Error   string            `json:"error"`
+		Message string            `json:"message"`
+		Data    map[string]string `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&respBody); err != nil {
+		t.Fatalf("decode failed: %v", err)
+	}
+	if respBody.Data["fee.account_id"] != "insufficient account balance" {
+		t.Errorf("expected fee.account_id error 'insufficient account balance', got %v", respBody.Data)
+	}
+}

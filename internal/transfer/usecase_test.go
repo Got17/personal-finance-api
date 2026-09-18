@@ -2,6 +2,7 @@ package transfer_test
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -458,5 +459,53 @@ func TestCreateTransfer_FundedByInboundTransfer_CascadingTransfer_Success(t *tes
 	bal2, _ := repo.GetAccountBalance(context.Background(), "user-1", "acct-usd-2")
 	if bal2 != 1000 {
 		t.Errorf("acct-usd-2 balance = %d, want 1000", bal2)
+	}
+}
+
+func TestCreateTransfer_ConcurrentTransfers_PreventOverdraft(t *testing.T) {
+	uc, repo, _, _ := setupTransferTest()
+	repo.SetAccountBalance("acct-usd-1", 10000)
+	repo.SetAccountBalance("acct-usd-2", 0)
+
+	var wg sync.WaitGroup
+	results := make(chan error, 2)
+
+	for i := 0; i < 2; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, err := (*uc).CreateTransfer(context.Background(), "user-1", &transfer.CreateTransferInput{
+				SourceAccountID:      "acct-usd-1",
+				DestinationAccountID: "acct-usd-2",
+				SourceAmountMinor:    8000,
+				Date:                 time.Now(),
+			})
+			results <- err
+		}()
+	}
+
+	wg.Wait()
+	close(results)
+
+	var successCount, failureCount int
+	for err := range results {
+		if err == nil {
+			successCount++
+		} else {
+			failureCount++
+			appErr, ok := errs.IsAppError(err)
+			if !ok || appErr.Status != 422 {
+				t.Errorf("expected 422 error on concurrent overdraft, got %v", err)
+			}
+		}
+	}
+
+	if successCount != 1 || failureCount != 1 {
+		t.Fatalf("expected exactly 1 success and 1 failure, got %d successes and %d failures", successCount, failureCount)
+	}
+
+	bal, _ := repo.GetAccountBalance(context.Background(), "user-1", "acct-usd-1")
+	if bal != 2000 {
+		t.Errorf("acct-usd-1 balance = %d, want 2000 (10000 - 8000)", bal)
 	}
 }

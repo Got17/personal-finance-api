@@ -3,6 +3,7 @@ package transfer
 import (
 	"context"
 	"errors"
+	"sort"
 
 	"github.com/BounkhongDev/bkgo/contract"
 	"gorm.io/gorm"
@@ -22,11 +23,13 @@ func NewTransferRepository(db contract.ORM) TransferRepository {
 
 func (r *transferRepository) CreateTransferWithLegsAndFee(ctx context.Context, t *Transfer, quote *fxquote.HistoricalFXQuote, fee *financialrecord.FinancialRecord) error {
 	return r.db.Session(ctx).Transaction(func(tx *gorm.DB) error {
-		var dummy string
-		if tx.Dialector != nil && tx.Dialector.Name() == "postgres" {
-			if err := tx.Table("accounts").Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", t.SourceAccountID).Select("id").Take(&dummy).Error; err != nil {
-				return err
-			}
+		// Collect participating accounts and lock in deterministic sorted order to prevent cyclic wait deadlocks
+		accountIDs := []string{t.SourceAccountID}
+		if fee != nil && fee.AccountID != t.SourceAccountID {
+			accountIDs = append(accountIDs, fee.AccountID)
+		}
+		if err := lockAccounts(tx, accountIDs...); err != nil {
+			return err
 		}
 
 		sourceBalance, err := r.calculateAccountBalance(tx, t.UserID, t.SourceAccountID)
@@ -44,11 +47,6 @@ func (r *transferRepository) CreateTransferWithLegsAndFee(ctx context.Context, t
 		}
 
 		if fee != nil && fee.AccountID != t.SourceAccountID {
-			if tx.Dialector != nil && tx.Dialector.Name() == "postgres" {
-				if err := tx.Table("accounts").Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", fee.AccountID).Select("id").Take(&dummy).Error; err != nil {
-					return err
-				}
-			}
 			feeBalance, err := r.calculateAccountBalance(tx, fee.UserID, fee.AccountID)
 			if err != nil {
 				return err
@@ -75,8 +73,28 @@ func (r *transferRepository) CreateTransferWithLegsAndFee(ctx context.Context, t
 	})
 }
 
-func (r *transferRepository) GetAccountBalance(ctx context.Context, userID string, accountID string) (int64, error) {
-	return r.calculateAccountBalance(r.db.Session(ctx), userID, accountID)
+// lockAccounts locks account rows deterministically in ascending ID order to prevent deadlocks under concurrency.
+func lockAccounts(tx *gorm.DB, accountIDs ...string) error {
+	if tx.Dialector == nil || tx.Dialector.Name() != "postgres" {
+		return nil
+	}
+	seen := make(map[string]bool, len(accountIDs))
+	var unique []string
+	for _, id := range accountIDs {
+		if id != "" && !seen[id] {
+			seen[id] = true
+			unique = append(unique, id)
+		}
+	}
+	sort.Strings(unique)
+
+	var dummy string
+	for _, id := range unique {
+		if err := tx.Table("accounts").Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", id).Select("id").Take(&dummy).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *transferRepository) calculateAccountBalance(tx *gorm.DB, userID, accountID string) (int64, error) {
