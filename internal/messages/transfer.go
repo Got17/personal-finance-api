@@ -9,5 +9,6 @@ const (
 	MsgTransferRateMustBePositive        = "exchange rate must be greater than zero"
 	MsgFXQuoteNotFound                   = "fx quote not found"
 	MsgFXRateUnavailable                 = "exchange rate is unavailable for the requested currency pair and date"
+	MsgInsufficientAccountBalance        = "insufficient account balance"
 )
 

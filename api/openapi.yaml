@@ -757,7 +757,7 @@ paths:
     post:
       operationId: createTransfer
       summary: Create a same- or cross-currency transfer between owned accounts
-      description: Atomically debits the source account and credits the destination account. Same-currency transfers require equal leg amounts. Cross-currency transfers validate destination amounts against the record-date or manually overridden historical FX quote precision. An optional transfer fee is recorded as a linked expense.
+      description: Atomically debits the source account and credits the destination account. Validates that the source account (and fee account if applicable) holds sufficient available balance. Same-currency transfers require equal leg amounts. Cross-currency transfers validate destination amounts against the record-date or manually overridden historical FX quote precision. An optional transfer fee is recorded as a linked expense.
       security:
         - bearerAuth: []
       requestBody:
@@ -777,7 +777,7 @@ paths:
         '401': { description: Unauthenticated or invalid token. }
         '403': { description: A referenced account belongs to another user. }
         '404': { description: A referenced account or category was not found. }
-        '422': { description: Validation failed, including inactive accounts, identical source/destination, precision mismatch, or missing rate. }
+        '422': { description: Validation failed, including insufficient account balance, inactive accounts, identical source/destination, precision mismatch, or missing rate. }
     get:
       operationId: listTransfers
       summary: List the authenticated user's transfers
@@ -1241,7 +1241,7 @@ components:
         type:
           type: string
           example: checking
-          enum: [checking, savings, credit_card, investment, cash, loan, other]
+          enum: [checking, savings, investment, cash, other]
         currency:
           $ref: '#/components/schemas/CurrencyCode'
         description:
@@ -1259,7 +1259,7 @@ components:
         type:
           type: string
           example: savings
-          enum: [checking, savings, credit_card, investment, cash, loan, other]
+          enum: [checking, savings, investment, cash, other]
         currency:
           $ref: '#/components/schemas/CurrencyCode'
         description:
@@ -1292,7 +1292,7 @@ components:
         type:
           type: string
           example: checking
-          enum: [checking, savings, credit_card, investment, cash, loan, other]
+          enum: [checking, savings, investment, cash, other]
         currency:
           $ref: '#/components/schemas/CurrencyCode'
         description:

@@ -42,24 +42,57 @@ func (m *mockCategoryReader) GetCategory(_ context.Context, userID string, categ
 }
 
 type mockTransferRepo struct {
-	transfers    map[string]*transfer.Transfer
-	quotes       map[string]*fxquote.HistoricalFXQuote
-	feeRecords   map[string]*financialrecord.FinancialRecord
-	failOnCreate bool
+	transfers       map[string]*transfer.Transfer
+	quotes          map[string]*fxquote.HistoricalFXQuote
+	feeRecords      map[string]*financialrecord.FinancialRecord
+	accountBalances map[string]int64
+	failOnCreate    bool
 }
 
 func newMockTransferRepo() *mockTransferRepo {
 	return &mockTransferRepo{
-		transfers:  make(map[string]*transfer.Transfer),
-		quotes:     make(map[string]*fxquote.HistoricalFXQuote),
-		feeRecords: make(map[string]*financialrecord.FinancialRecord),
+		transfers:       make(map[string]*transfer.Transfer),
+		quotes:          make(map[string]*fxquote.HistoricalFXQuote),
+		feeRecords:      make(map[string]*financialrecord.FinancialRecord),
+		accountBalances: make(map[string]int64),
 	}
+}
+
+func (m *mockTransferRepo) SetAccountBalance(accountID string, balance int64) {
+	m.accountBalances[accountID] = balance
+}
+
+func (m *mockTransferRepo) GetAccountBalance(_ context.Context, _ string, accountID string) (int64, error) {
+	return m.accountBalances[accountID], nil
 }
 
 func (m *mockTransferRepo) CreateTransferWithLegsAndFee(_ context.Context, t *transfer.Transfer, q *fxquote.HistoricalFXQuote, fee *financialrecord.FinancialRecord) error {
 	if m.failOnCreate {
 		return errors.New("database transaction failed")
 	}
+
+	sourceBalance := m.accountBalances[t.SourceAccountID]
+	requiredOutlay := t.SourceAmountMinor
+	if fee != nil && fee.AccountID == t.SourceAccountID {
+		requiredOutlay += fee.AmountMinor
+	}
+	if sourceBalance < requiredOutlay {
+		return transfer.ErrInsufficientAccountBalance
+	}
+
+	if fee != nil && fee.AccountID != t.SourceAccountID {
+		feeBalance := m.accountBalances[fee.AccountID]
+		if feeBalance < fee.AmountMinor {
+			return transfer.ErrInsufficientFeeAccountBalance
+		}
+	}
+
+	m.accountBalances[t.SourceAccountID] -= requiredOutlay
+	m.accountBalances[t.DestinationAccountID] += t.DestinationAmountMinor
+	if fee != nil && fee.AccountID != t.SourceAccountID {
+		m.accountBalances[fee.AccountID] -= fee.AmountMinor
+	}
+
 	m.transfers[t.ID] = t
 	if q != nil {
 		m.quotes[q.ID] = q
@@ -137,6 +170,9 @@ func setupTransferTest() (*transfer.TransferUsecase, *mockTransferRepo, *mockAcc
 		},
 	}
 	repo := newMockTransferRepo()
+	repo.SetAccountBalance("acct-usd-1", 10_000_000)
+	repo.SetAccountBalance("acct-eur-1", 10_000_000)
+	repo.SetAccountBalance("acct-lak-1", 10_000_000_000)
 	rateProvider := fxquote.NewReferenceRateProvider()
 	uc := transfer.NewTransferUsecase(repo, acctReader, catReader, rateProvider)
 	return &uc, repo, acctReader, catReader

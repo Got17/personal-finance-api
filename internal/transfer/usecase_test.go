@@ -312,3 +312,151 @@ func TestGetTransfer_Success(t *testing.T) {
 	}
 	_ = repo
 }
+
+func TestCreateTransfer_ZeroBalance_Fails(t *testing.T) {
+	uc, _, _, _ := setupTransferTest()
+
+	// acct-usd-2 starts with 0 balance
+	_, err := (*uc).CreateTransfer(context.Background(), "user-1", &transfer.CreateTransferInput{
+		SourceAccountID:      "acct-usd-2",
+		DestinationAccountID: "acct-usd-1",
+		SourceAmountMinor:    5000,
+		Date:                 time.Now(),
+	})
+	if err == nil {
+		t.Fatal("expected error for zero balance account, got nil")
+	}
+
+	appErr, ok := errs.IsAppError(err)
+	if !ok || appErr.Status != 422 {
+		t.Fatalf("expected 422 AppError, got %#v", err)
+	}
+	fieldsMap, ok := appErr.Data.(map[string]string)
+	if !ok || fieldsMap["source_account_id"] != "insufficient account balance" {
+		t.Errorf("expected source_account_id error 'insufficient account balance', got %v", appErr.Data)
+	}
+}
+
+func TestCreateTransfer_ExceedingBalance_Fails(t *testing.T) {
+	uc, repo, _, _ := setupTransferTest()
+	repo.SetAccountBalance("acct-usd-1", 5000)
+
+	_, err := (*uc).CreateTransfer(context.Background(), "user-1", &transfer.CreateTransferInput{
+		SourceAccountID:      "acct-usd-1",
+		DestinationAccountID: "acct-usd-2",
+		SourceAmountMinor:    5001,
+		Date:                 time.Now(),
+	})
+	if err == nil {
+		t.Fatal("expected error when transfer exceeds balance, got nil")
+	}
+
+	appErr, ok := errs.IsAppError(err)
+	if !ok || appErr.Status != 422 {
+		t.Fatalf("expected 422 AppError, got %#v", err)
+	}
+	fieldsMap, ok := appErr.Data.(map[string]string)
+	if !ok || fieldsMap["source_account_id"] != "insufficient account balance" {
+		t.Errorf("expected source_account_id error 'insufficient account balance', got %v", appErr.Data)
+	}
+}
+
+func TestCreateTransfer_FeeExceedingSourceBalance_Fails(t *testing.T) {
+	uc, repo, _, _ := setupTransferTest()
+	repo.SetAccountBalance("acct-usd-1", 1000)
+
+	_, err := (*uc).CreateTransfer(context.Background(), "user-1", &transfer.CreateTransferInput{
+		SourceAccountID:      "acct-usd-1",
+		DestinationAccountID: "acct-usd-2",
+		SourceAmountMinor:    950,
+		Date:                 time.Now(),
+		Fee: &transfer.TransferFeeInput{
+			AccountID:   "acct-usd-1",
+			CategoryID:  "cat-expense",
+			AmountMinor: 60, // 950 + 60 = 1010 > 1000
+		},
+	})
+	if err == nil {
+		t.Fatal("expected error when transfer + fee exceeds balance, got nil")
+	}
+
+	appErr, ok := errs.IsAppError(err)
+	if !ok || appErr.Status != 422 {
+		t.Fatalf("expected 422 AppError, got %#v", err)
+	}
+	fieldsMap, ok := appErr.Data.(map[string]string)
+	if !ok || fieldsMap["source_account_id"] != "insufficient account balance" {
+		t.Errorf("expected source_account_id error 'insufficient account balance', got %v", appErr.Data)
+	}
+}
+
+func TestCreateTransfer_FeeExceedingDistinctFeeAccountBalance_Fails(t *testing.T) {
+	uc, repo, _, _ := setupTransferTest()
+	repo.SetAccountBalance("acct-usd-1", 50000)
+	repo.SetAccountBalance("acct-usd-2", 10) // fee account has only 10
+
+	_, err := (*uc).CreateTransfer(context.Background(), "user-1", &transfer.CreateTransferInput{
+		SourceAccountID:      "acct-usd-1",
+		DestinationAccountID: "acct-usd-2",
+		SourceAmountMinor:    1000,
+		Date:                 time.Now(),
+		Fee: &transfer.TransferFeeInput{
+			AccountID:   "acct-usd-2",
+			CategoryID:  "cat-expense",
+			AmountMinor: 50, // 50 > 10
+		},
+	})
+	if err == nil {
+		t.Fatal("expected error when fee exceeds distinct fee account balance, got nil")
+	}
+
+	appErr, ok := errs.IsAppError(err)
+	if !ok || appErr.Status != 422 {
+		t.Fatalf("expected 422 AppError, got %#v", err)
+	}
+	fieldsMap, ok := appErr.Data.(map[string]string)
+	if !ok || fieldsMap["fee.account_id"] != "insufficient account balance" {
+		t.Errorf("expected fee.account_id error 'insufficient account balance', got %v", appErr.Data)
+	}
+}
+
+func TestCreateTransfer_FundedByInboundTransfer_CascadingTransfer_Success(t *testing.T) {
+	uc, repo, _, _ := setupTransferTest()
+	repo.SetAccountBalance("acct-usd-1", 5000)
+	repo.SetAccountBalance("acct-usd-2", 0)
+
+	// Transfer 3000 from acct-usd-1 to acct-usd-2
+	_, err := (*uc).CreateTransfer(context.Background(), "user-1", &transfer.CreateTransferInput{
+		SourceAccountID:      "acct-usd-1",
+		DestinationAccountID: "acct-usd-2",
+		SourceAmountMinor:    3000,
+		Date:                 time.Now(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error on first transfer: %v", err)
+	}
+
+	// Now acct-usd-2 has 3000, transfer 2000 from acct-usd-2 back to acct-usd-1
+	res, err := (*uc).CreateTransfer(context.Background(), "user-1", &transfer.CreateTransferInput{
+		SourceAccountID:      "acct-usd-2",
+		DestinationAccountID: "acct-usd-1",
+		SourceAmountMinor:    2000,
+		Date:                 time.Now(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error on cascading transfer: %v", err)
+	}
+	if res.SourceAmountMinor != 2000 {
+		t.Errorf("got source amount %d, want 2000", res.SourceAmountMinor)
+	}
+
+	// Check final balances: acct-usd-1: 5000 - 3000 + 2000 = 4000; acct-usd-2: 0 + 3000 - 2000 = 1000
+	bal1, _ := repo.GetAccountBalance(context.Background(), "user-1", "acct-usd-1")
+	if bal1 != 4000 {
+		t.Errorf("acct-usd-1 balance = %d, want 4000", bal1)
+	}
+	bal2, _ := repo.GetAccountBalance(context.Background(), "user-1", "acct-usd-2")
+	if bal2 != 1000 {
+		t.Errorf("acct-usd-2 balance = %d, want 1000", bal2)
+	}
+}

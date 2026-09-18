@@ -6,6 +6,7 @@ import (
 
 	"github.com/BounkhongDev/bkgo/contract"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"github.com/Got17/personal-finance-api/internal/financialrecord"
 	"github.com/Got17/personal-finance-api/internal/fxquote"
@@ -21,6 +22,42 @@ func NewTransferRepository(db contract.ORM) TransferRepository {
 
 func (r *transferRepository) CreateTransferWithLegsAndFee(ctx context.Context, t *Transfer, quote *fxquote.HistoricalFXQuote, fee *financialrecord.FinancialRecord) error {
 	return r.db.Session(ctx).Transaction(func(tx *gorm.DB) error {
+		var dummy string
+		if tx.Dialector != nil && tx.Dialector.Name() == "postgres" {
+			if err := tx.Table("accounts").Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", t.SourceAccountID).Select("id").Take(&dummy).Error; err != nil {
+				return err
+			}
+		}
+
+		sourceBalance, err := r.calculateAccountBalance(tx, t.UserID, t.SourceAccountID)
+		if err != nil {
+			return err
+		}
+
+		requiredSourceOutlay := t.SourceAmountMinor
+		if fee != nil && fee.AccountID == t.SourceAccountID {
+			requiredSourceOutlay += fee.AmountMinor
+		}
+
+		if sourceBalance < requiredSourceOutlay {
+			return ErrInsufficientAccountBalance
+		}
+
+		if fee != nil && fee.AccountID != t.SourceAccountID {
+			if tx.Dialector != nil && tx.Dialector.Name() == "postgres" {
+				if err := tx.Table("accounts").Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", fee.AccountID).Select("id").Take(&dummy).Error; err != nil {
+					return err
+				}
+			}
+			feeBalance, err := r.calculateAccountBalance(tx, fee.UserID, fee.AccountID)
+			if err != nil {
+				return err
+			}
+			if feeBalance < fee.AmountMinor {
+				return ErrInsufficientFeeAccountBalance
+			}
+		}
+
 		if quote != nil {
 			if err := tx.Create(quote).Error; err != nil {
 				return err
@@ -36,6 +73,34 @@ func (r *transferRepository) CreateTransferWithLegsAndFee(ctx context.Context, t
 		}
 		return nil
 	})
+}
+
+func (r *transferRepository) GetAccountBalance(ctx context.Context, userID string, accountID string) (int64, error) {
+	return r.calculateAccountBalance(r.db.Session(ctx), userID, accountID)
+}
+
+func (r *transferRepository) calculateAccountBalance(tx *gorm.DB, userID, accountID string) (int64, error) {
+	var balance int64
+	query := `
+		SELECT 
+			COALESCE(SUM(CASE 
+				WHEN account_id = ? AND kind = 'income' THEN amount_minor 
+				WHEN destination_account_id = ? AND kind = 'transfer' THEN destination_amount_minor 
+				ELSE 0 
+			END), 0)
+			-
+			COALESCE(SUM(CASE 
+				WHEN account_id = ? AND kind = 'expense' THEN amount_minor 
+				WHEN account_id = ? AND kind = 'transfer' THEN amount_minor 
+				ELSE 0 
+			END), 0) AS balance
+		FROM financial_records
+		WHERE user_id = ? AND is_active = true AND (account_id = ? OR destination_account_id = ?)
+	`
+	if err := tx.Raw(query, accountID, accountID, accountID, accountID, userID, accountID, accountID).Scan(&balance).Error; err != nil {
+		return 0, err
+	}
+	return balance, nil
 }
 
 func (r *transferRepository) FindByID(ctx context.Context, id string) (*Transfer, error) {

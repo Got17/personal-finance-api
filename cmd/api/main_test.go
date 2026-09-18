@@ -881,6 +881,10 @@ func (m *mainTestTransferRepo) FindByUserID(_ context.Context, userID string, fi
 	return list, nil
 }
 
+func (m *mainTestTransferRepo) GetAccountBalance(_ context.Context, _ string, _ string) (int64, error) {
+	return 1_000_000, nil
+}
+
 type mainTestFXQuoteRepo struct {
 	quotes map[string]*fxquote.HistoricalFXQuote
 }

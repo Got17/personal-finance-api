@@ -29,6 +29,8 @@ type transferHandlerFixture struct {
 func setupTransferHandlerFixture() *transferHandlerFixture {
 	token := jwt.New(config.JWT{Secret: "test-secret"})
 	repo := newMockTransferRepo()
+	repo.SetAccountBalance("acct-usd-1", 10_000_000)
+	repo.SetAccountBalance("acct-eur-1", 10_000_000)
 	acctReader := &mockAccountReader{
 		accounts: map[string]*account.Account{
 			"acct-usd-1":  {ID: "acct-usd-1", UserID: "user-1", Currency: "USD", IsActive: true},
@@ -206,5 +208,44 @@ func TestTransferHTTP_Unauthorized(t *testing.T) {
 
 	if resp.StatusCode != fiber.StatusUnauthorized {
 		t.Errorf("status = %d, want %d", resp.StatusCode, fiber.StatusUnauthorized)
+	}
+}
+
+func TestTransferHTTP_InsufficientBalance_Returns422(t *testing.T) {
+	f := setupTransferHandlerFixture()
+	token := f.issueToken("user-1")
+
+	// acct-usd-2 has 0 balance
+	body, _ := json.Marshal(transfer.CreateTransferInput{
+		SourceAccountID:      "acct-usd-2",
+		DestinationAccountID: "acct-usd-1",
+		SourceAmountMinor:    1000,
+		Date:                 time.Date(2026, 9, 15, 10, 0, 0, 0, time.UTC),
+	})
+	req := httptest.NewRequest("POST", "/v1/transfers", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := f.app.Test(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != fiber.StatusUnprocessableEntity {
+		t.Errorf("status = %d, want %d", resp.StatusCode, fiber.StatusUnprocessableEntity)
+	}
+
+	var respBody struct {
+		Success bool              `json:"success"`
+		Error   string            `json:"error"`
+		Message string            `json:"message"`
+		Data    map[string]string `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&respBody); err != nil {
+		t.Fatalf("decode failed: %v", err)
+	}
+	if respBody.Data["source_account_id"] != "insufficient account balance" {
+		t.Errorf("expected source_account_id error 'insufficient account balance', got %v", respBody.Data)
 	}
 }
