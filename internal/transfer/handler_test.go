@@ -245,8 +245,8 @@ func TestTransferHTTP_InsufficientBalance_Returns422(t *testing.T) {
 	if err := json.NewDecoder(resp.Body).Decode(&respBody); err != nil {
 		t.Fatalf("decode failed: %v", err)
 	}
-	if respBody.Message != "source account has insufficient balance to complete the transfer" {
-		t.Errorf("expected message 'source account has insufficient balance to complete the transfer', got %q", respBody.Message)
+	if respBody.Message != "Source account has insufficient balance to complete the transfer" {
+		t.Errorf("expected message 'Source account has insufficient balance to complete the transfer', got %q", respBody.Message)
 	}
 	if respBody.Data["source_account_id"] != "insufficient account balance" {
 		t.Errorf("expected source_account_id error 'insufficient account balance', got %v", respBody.Data)
@@ -293,8 +293,8 @@ func TestTransferHTTP_FeeAccountInsufficientBalance_Returns422(t *testing.T) {
 	if err := json.NewDecoder(resp.Body).Decode(&respBody); err != nil {
 		t.Fatalf("decode failed: %v", err)
 	}
-	if respBody.Message != "fee account has insufficient balance to pay the transfer fee" {
-		t.Errorf("expected message 'fee account has insufficient balance to pay the transfer fee', got %q", respBody.Message)
+	if respBody.Message != "Fee account has insufficient balance to pay the transfer fee" {
+		t.Errorf("expected message 'Fee account has insufficient balance to pay the transfer fee', got %q", respBody.Message)
 	}
 	if respBody.Data["fee.account_id"] != "insufficient account balance" {
 		t.Errorf("expected fee.account_id error 'insufficient account balance', got %v", respBody.Data)
