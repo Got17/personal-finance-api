@@ -83,7 +83,7 @@ func main() {
 	financialRecordHandler := financialrecord.NewFinancialRecordHandler(financialRecordUsecase)
 
 	fxQuoteRepo := fxquote.NewFXQuoteRepository(db)
-	fxQuoteProvider := fxquote.NewReferenceRateProvider()
+	fxQuoteProvider := fxquote.NewOpenExchangeRateProvider(nil, fxquote.NewReferenceRateProvider())
 	fxQuoteUsecase := fxquote.NewFXQuoteUsecase(fxQuoteRepo, fxQuoteProvider)
 	fxQuoteHandler := fxquote.NewFXQuoteHandler(fxQuoteUsecase)
 
